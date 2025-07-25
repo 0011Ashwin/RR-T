@@ -1,0 +1,15 @@
+Student:
+  Email: student@example.com
+  Password: student123
+
+Admin - VC:
+  Email: vc@example.com
+  Password: vc123
+
+Admin - Principal:
+  Email: principal@example.com
+  Password: principal123
+
+Admin - HOD:
+  Email: hod@example.com
+  Password: hod123 
