@@ -489,6 +489,22 @@ export default function StudentDashboard() {
     }
   };
 
+  // Prepare data for Luma chatbot
+  const chatbotData = {
+    name: studentProfile.name,
+    gpa: academicData.grades.cumulativeGPA,
+    attendance: attendanceData.overall,
+    rank: studentProfile.rank,
+    totalStudents: studentProfile.totalStudents,
+    subjects: academicData.subjects.map(subject => ({
+      name: subject.name,
+      grade: subject.currentGrade,
+      progress: subject.progress,
+      assignments: subject.assignments,
+    })),
+    upcomingEvents: upcomingEvents,
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Enhanced Header */}
