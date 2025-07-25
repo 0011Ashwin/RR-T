@@ -102,6 +102,35 @@ End with 2-3 relevant follow-up suggestions.`;
   }
 };
 
+function extractSuggestions(botMessage: string, userMessage: string): string[] | null {
+  // Try to extract suggestions from bot message if it contains a suggestions section
+  const suggestionMatch = botMessage.match(/(?:Suggestions?|Follow-up|Next steps?):\s*\n?((?:[-•]\s*.+\n?)+)/i);
+  if (suggestionMatch) {
+    return suggestionMatch[1]
+      .split('\n')
+      .map(s => s.replace(/^[-•]\s*/, '').trim())
+      .filter(s => s.length > 0)
+      .slice(0, 3);
+  }
+  return null;
+}
+
+function generateDefaultSuggestions(userMessage: string): string[] {
+  const msg = userMessage.toLowerCase();
+
+  if (msg.includes('performance') || msg.includes('academic')) {
+    return ['Improve weak subjects', 'Study tips', 'Time management'];
+  }
+  if (msg.includes('study')) {
+    return ['Create study schedule', 'Find study group', 'Assignment help'];
+  }
+  if (msg.includes('exam')) {
+    return ['Exam strategy', 'Practice tests', 'Stress management'];
+  }
+
+  return ['Academic analysis', 'Study recommendations', 'Weekly focus areas'];
+}
+
 function generateSmartResponse(message: string, studentData: any) {
   const msg = message.toLowerCase();
   
