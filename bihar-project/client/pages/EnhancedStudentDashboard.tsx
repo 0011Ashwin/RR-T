@@ -1582,6 +1582,9 @@ export default function StudentDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Luma AI Chatbot */}
+      <LumaChatbot studentData={chatbotData} />
     </div>
   );
 }
