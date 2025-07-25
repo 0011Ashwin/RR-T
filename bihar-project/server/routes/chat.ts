@@ -28,45 +28,63 @@ interface ChatResponse {
   suggestions?: string[];
 }
 
-// You'll need to install the Google Generative AI package:
-// npm install @google/generative-ai
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const handleChat: RequestHandler = async (req, res) => {
   try {
     const { message, studentData }: ChatRequest = req.body;
 
-    // For demonstration, we'll use a fallback response system
-    // In production, you would integrate with Gemini API like this:
-    
-    /*
-    import { GoogleGenerativeAI } from "@google/generative-ai";
-    
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    
-    const prompt = `You are Luma, an AI study companion for students. 
-    You help students with academic performance analysis, study recommendations, and educational guidance.
-    
-    Student Data:
-    - Name: ${studentData.name}
-    - GPA: ${studentData.gpa}
-    - Attendance: ${studentData.attendance}%
-    - Class Rank: ${studentData.rank}/${studentData.totalStudents}
-    - Subjects: ${studentData.subjects.map(s => `${s.name} (${s.grade}, ${s.progress}% complete)`).join(', ')}
-    - Upcoming Events: ${studentData.upcomingEvents.map(e => `${e.title} (${e.date})`).join(', ')}
-    
-    Student Question: ${message}
-    
-    Please provide a helpful, encouraging, and personalized response focused on academic success. 
-    Use emojis appropriately and format with markdown for better readability.
-    Keep responses concise but informative.`;
-    
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const botMessage = response.text();
-    */
+    // Check if Gemini API key is available
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    // Fallback response system for demonstration
+    if (apiKey) {
+      try {
+        // Use Gemini API for intelligent responses
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+        const prompt = `You are Luma, an AI study companion for students.
+You help students with academic performance analysis, study recommendations, and educational guidance.
+Always be encouraging, supportive, and personalized in your responses.
+
+Student Profile:
+- Name: ${studentData.name}
+- GPA: ${studentData.gpa}/10
+- Attendance: ${studentData.attendance}%
+- Class Rank: ${studentData.rank} out of ${studentData.totalStudents} students
+
+Current Subjects:
+${studentData.subjects.map(s => `- ${s.name}: Grade ${s.grade}, ${s.progress}% complete, ${s.assignments.completed}/${s.assignments.total} assignments done`).join('\n')}
+
+Upcoming Events:
+${studentData.upcomingEvents.map(e => `- ${e.title} on ${e.date} (${e.type}, ${e.priority} priority)`).join('\n')}
+
+Student Question: "${message}"
+
+Please provide a helpful, encouraging, and personalized response focused on academic success.
+Use emojis appropriately and format with markdown for better readability.
+Keep responses concise but informative (max 300 words).
+End with 2-3 relevant follow-up suggestions.`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const botMessage = response.text();
+
+        // Extract suggestions from the response or provide default ones
+        const suggestions = extractSuggestions(botMessage, message) || generateDefaultSuggestions(message);
+
+        res.json({
+          message: botMessage,
+          suggestions: suggestions,
+        });
+        return;
+      } catch (geminiError) {
+        console.error("Gemini API error:", geminiError);
+        // Fall through to use fallback system
+      }
+    }
+
+    // Fallback response system when Gemini API is not available
     const botResponse = generateSmartResponse(message, studentData);
 
     const response: ChatResponse = {
