@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import UniversityDashboard from "./pages/UniversityDashboard";
 import CollegeDashboard from "./pages/CollegeDashboard";
-import StudentDashboard from "./pages/StudentDashboard";
+import StudentDashboard from "./pages/EnhancedStudentDashboard";
 import HODDashboard from "./pages/HODDashboard";
 import CollegeDetails from "./pages/CollegeDetails";
 import TeachingStaff from "./pages/TeachingStaff";
