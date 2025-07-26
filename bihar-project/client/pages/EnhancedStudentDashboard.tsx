@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import Calendar from "@/components/Calendar";
+import LumaChatbot from "@/components/LumaChatbot";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -486,6 +487,22 @@ export default function StudentDashboard() {
       default:
         return "text-gray-600 bg-gray-50 border-gray-200";
     }
+  };
+
+  // Prepare data for Luma chatbot
+  const chatbotData = {
+    name: studentProfile.name,
+    gpa: academicData.grades.cumulativeGPA,
+    attendance: attendanceData.overall,
+    rank: studentProfile.rank,
+    totalStudents: studentProfile.totalStudents,
+    subjects: academicData.subjects.map(subject => ({
+      name: subject.name,
+      grade: subject.currentGrade,
+      progress: subject.progress,
+      assignments: subject.assignments,
+    })),
+    upcomingEvents: upcomingEvents,
   };
 
   return (
@@ -1565,6 +1582,9 @@ export default function StudentDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Luma AI Chatbot */}
+      <LumaChatbot studentData={chatbotData} />
     </div>
   );
 }
