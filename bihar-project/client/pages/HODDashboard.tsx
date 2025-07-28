@@ -632,6 +632,16 @@ export default function HODDashboard() {
             <TimetableManagement />
           </TabsContent>
 
+          {/* Class Allotment Tab */}
+          <TabsContent value="allotment" className="space-y-6">
+            <ClassAllotmentModule />
+          </TabsContent>
+
+          {/* Resource Overview Tab */}
+          <TabsContent value="resources" className="space-y-6">
+            <ResourceOverview />
+          </TabsContent>
+
           {/* Faculty Tab */}
           <TabsContent value="faculty" className="space-y-6">
             <Card>
