@@ -35,6 +35,8 @@ import {
   Mail,
 } from "lucide-react";
 import TimetableManagement from "../components/TimetableManagement";
+import ClassAllotmentModule from "../components/ClassAllotmentModule";
+import ResourceOverview from "../components/ResourceOverview";
 
 export default function HODDashboard() {
   const navigate = useNavigate();
@@ -180,18 +182,18 @@ export default function HODDashboard() {
       description: "Design class schedules",
     },
     {
-      title: "Manage Faculty",
-      icon: Users,
-      action: () => setActiveTab("faculty"),
+      title: "Room Allotment",
+      icon: MapPin,
+      action: () => setActiveTab("allotment"),
       color: "bg-green-500 hover:bg-green-600",
-      description: "View and assign faculty",
+      description: "Assign classrooms",
     },
     {
-      title: "View Reports",
-      icon: BarChart3,
-      action: () => {},
+      title: "Resource Overview",
+      icon: Building2,
+      action: () => setActiveTab("resources"),
       color: "bg-purple-500 hover:bg-purple-600",
-      description: "Department analytics",
+      description: "Monitor resources",
     },
     {
       title: "Approve Requests",
@@ -468,7 +470,7 @@ export default function HODDashboard() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-7 bg-white/80 backdrop-blur-sm">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
@@ -482,6 +484,20 @@ export default function HODDashboard() {
             >
               <CalendarDays className="h-4 w-4 mr-2" />
               Timetables
+            </TabsTrigger>
+            <TabsTrigger
+              value="allotment"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Class Allotment
+            </TabsTrigger>
+            <TabsTrigger
+              value="resources"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              Resources
             </TabsTrigger>
             <TabsTrigger
               value="faculty"
@@ -614,6 +630,16 @@ export default function HODDashboard() {
           {/* Timetables Tab */}
           <TabsContent value="timetables" className="space-y-6">
             <TimetableManagement />
+          </TabsContent>
+
+          {/* Class Allotment Tab */}
+          <TabsContent value="allotment" className="space-y-6">
+            <ClassAllotmentModule />
+          </TabsContent>
+
+          {/* Resource Overview Tab */}
+          <TabsContent value="resources" className="space-y-6">
+            <ResourceOverview />
           </TabsContent>
 
           {/* Faculty Tab */}
