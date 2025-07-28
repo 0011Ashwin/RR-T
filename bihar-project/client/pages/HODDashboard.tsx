@@ -470,7 +470,7 @@ export default function HODDashboard() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-7 bg-white/80 backdrop-blur-sm">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
@@ -484,6 +484,20 @@ export default function HODDashboard() {
             >
               <CalendarDays className="h-4 w-4 mr-2" />
               Timetables
+            </TabsTrigger>
+            <TabsTrigger
+              value="allotment"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Class Allotment
+            </TabsTrigger>
+            <TabsTrigger
+              value="resources"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              Resources
             </TabsTrigger>
             <TabsTrigger
               value="faculty"
