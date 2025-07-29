@@ -528,6 +528,13 @@ export default function HODDashboard() {
               Manage
             </TabsTrigger>
             <TabsTrigger
+              value="booking-requests"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Requests
+            </TabsTrigger>
+            <TabsTrigger
               value="faculty"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
             >
