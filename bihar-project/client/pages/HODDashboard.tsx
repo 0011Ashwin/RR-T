@@ -654,19 +654,24 @@ export default function HODDashboard() {
             </div>
           </TabsContent>
 
-          {/* Timetables Tab */}
-          <TabsContent value="timetables" className="space-y-6">
-            <TimetableManagement />
+          {/* University Resources Tab */}
+          <TabsContent value="university-resources" className="space-y-6">
+            <UniversityResources />
           </TabsContent>
 
-          {/* Class Allotment Tab */}
-          <TabsContent value="allotment" className="space-y-6">
-            <ClassAllotmentModule />
+          {/* Department Resources Tab */}
+          <TabsContent value="department-resources" className="space-y-6">
+            <DepartmentResources />
           </TabsContent>
 
-          {/* Resource Overview Tab */}
-          <TabsContent value="resources" className="space-y-6">
-            <ResourceOverview />
+          {/* Routine Builder Tab */}
+          <TabsContent value="routine-builder" className="space-y-6">
+            <RoutineBuilder />
+          </TabsContent>
+
+          {/* Resource Management Tab */}
+          <TabsContent value="resource-management" className="space-y-6">
+            <ResourceManagement />
           </TabsContent>
 
           {/* Faculty Tab */}
