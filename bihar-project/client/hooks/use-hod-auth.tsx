@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { HODUser, SAMPLE_HODS } from '@shared/resource-types';
+import { HODUser, SAMPLE_HODS } from '../../shared/resource-types';
 
 interface HODAuthContextType {
   currentHOD: HODUser | null;

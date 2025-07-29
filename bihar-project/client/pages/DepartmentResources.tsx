@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHODAuth } from '@/hooks/use-hod-auth';
-import { Resource, WeeklyTimeSlot, ClassSession, Course, DEFAULT_TIME_SLOTS } from '@shared/resource-types';
+import { Resource, WeeklyTimeSlot, ClassSession, Course, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
 import { 
   Building2, 
   Calendar, 
@@ -49,6 +50,16 @@ export default function DepartmentResources() {
 
   // Generate sample department resources based on current HOD
   useEffect(() => {
+    const fetchClassSessions = async () => {
+      try {
+        const response = await axios.get<ClassSession[]>('/api/class-sessions');
+        setClassSessions(response.data);
+      } catch (error) {
+        console.error('Error fetching class sessions:', error);
+      }
+    };
+
+    fetchClassSessions();
     if (!currentHOD) return;
 
     const departmentResources: Resource[] = 
@@ -247,6 +258,39 @@ export default function DepartmentResources() {
     generateWeeklySlots();
   }, [currentHOD]);
 
+  useEffect(() => {
+    // This effect runs whenever classSessions or weeklySlots change
+    // and updates the occupied status of weekly slots based on current class sessions.
+    setWeeklySlots(prev => prev.map(slot => {
+      const session = classSessions.find(s =>
+        s.resourceId === slot.resourceId &&
+        s.timeSlotId === slot.timeSlotId &&
+        s.dayOfWeek === slot.dayOfWeek
+      );
+
+      if (session) {
+        const course = courses.find(c => c.id === session.courseId);
+        return {
+          ...slot,
+          isOccupied: true,
+          occupiedBy: {
+            courseId: session.courseId,
+            courseName: course?.name || '',
+            department: currentHOD?.department || '',
+            faculty: session.faculty,
+            classSize: course?.expectedSize || 0,
+          }
+        };
+      }
+
+      return {
+        ...slot,
+        isOccupied: false,
+        occupiedBy: undefined,
+      };
+    }));
+  }, [classSessions, courses, currentHOD]);
+
   const getSlotForResource = (resourceId: string, timeSlotId: string, day: number) => {
     return weeklySlots.find(slot => 
       slot.resourceId === resourceId && 
@@ -347,11 +391,47 @@ export default function DepartmentResources() {
       faculty: '',
       type: 'theory',
     });
-    setConflicts([]);
+    try {
+      await axios.post('/api/class-sessions', sessionWithId);
+      setAllocationDialogOpen(false);
+      setSelectedSlot(null);
+      setAllocationForm({
+        courseId: '',
+        faculty: '',
+        type: 'theory',
+      });
+      setConflicts([]);
+      // Optionally, refetch class sessions or update local state to reflect the change
+      // For now, we're just updating local state, assuming the API call succeeds.
+    } catch (error) {
+      console.error('Error allocating slot:', error);
+      setConflicts(['Failed to allocate slot. Please try again.']);
+    }
   };
 
-  const handleRemoveAllocation = (session: ClassSession) => {
-    setClassSessions(prev => prev.filter(s => s.id !== session.id));
+  const handleRemoveAllocation = async (session: ClassSession) => {
+    try {
+      await axios.delete(`/api/class-sessions/${session.id}`);
+      setClassSessions(prev => prev.filter(s => s.id !== session.id));
+
+      // Update weekly slot to mark as vacant
+      setWeeklySlots(prev => prev.map(slot => {
+        if (slot.resourceId === session.resourceId &&
+            slot.timeSlotId === session.timeSlotId &&
+            slot.dayOfWeek === session.dayOfWeek) {
+          return {
+            ...slot,
+            isOccupied: false,
+            occupiedBy: undefined,
+          };
+        }
+        return slot;
+      }));
+    } catch (error) {
+      console.error('Error removing allocation:', error);
+      // Optionally, show an error message to the user
+    }
+  };
     
     // Update weekly slot to mark as vacant
     setWeeklySlots(prev => prev.map(slot => {
@@ -368,14 +448,21 @@ export default function DepartmentResources() {
     }));
   };
 
-  const autoGenerateRoutine = () => {
+  const autoGenerateRoutine = async () => {
     // Clear existing sessions
-    setClassSessions([]);
-    setWeeklySlots(prev => prev.map(slot => ({
-      ...slot,
-      isOccupied: false,
-      occupiedBy: undefined,
-    })));
+    try {
+      await axios.delete('/api/class-sessions/all'); // API endpoint to clear all sessions
+      setClassSessions([]);
+      setWeeklySlots(prev => prev.map(slot => ({
+        ...slot,
+        isOccupied: false,
+        occupiedBy: undefined,
+      })));
+    } catch (error) {
+      console.error('Error clearing existing sessions:', error);
+      // Handle error, maybe show a message to the user
+      return;
+    }
 
     const newSessions: ClassSession[] = [];
     const usedSlots = new Set<string>();
@@ -419,37 +506,43 @@ export default function DepartmentResources() {
       }
     });
 
-    setClassSessions(newSessions);
+    try {
+      await axios.post('/api/class-sessions/bulk', newSessions); // API endpoint to save multiple sessions
+      setClassSessions(newSessions);
 
-    // Update weekly slots
-    setWeeklySlots(prev => prev.map(slot => {
-      const session = newSessions.find(s =>
-        s.resourceId === slot.resourceId &&
-        s.timeSlotId === slot.timeSlotId &&
-        s.dayOfWeek === slot.dayOfWeek
-      );
+      // Update weekly slots
+      setWeeklySlots(prev => prev.map(slot => {
+        const session = newSessions.find(s =>
+          s.resourceId === slot.resourceId &&
+          s.timeSlotId === slot.timeSlotId &&
+          s.dayOfWeek === slot.dayOfWeek
+        );
 
-      if (session) {
-        const course = courses.find(c => c.id === session.courseId);
+        if (session) {
+          const course = courses.find(c => c.id === session.courseId);
+          return {
+            ...slot,
+            isOccupied: true,
+            occupiedBy: {
+              courseId: session.courseId,
+              courseName: course?.name || '',
+              department: currentHOD?.department || '',
+              faculty: session.faculty,
+              classSize: course?.expectedSize || 0,
+            }
+          };
+        }
+
         return {
           ...slot,
-          isOccupied: true,
-          occupiedBy: {
-            courseId: session.courseId,
-            courseName: course?.name || '',
-            department: currentHOD?.department || '',
-            faculty: session.faculty,
-            classSize: course?.expectedSize || 0,
-          }
+          isOccupied: false,
+          occupiedBy: undefined,
         };
-      }
-
-      return {
-        ...slot,
-        isOccupied: false,
-        occupiedBy: undefined,
-      };
-    }));
+      }));
+    } catch (error) {
+      console.error('Error auto-generating routine:', error);
+      // Handle error, maybe show a message to the user
+    }
   };
 
   const openAllocationDialog = (resourceId: string, timeSlotId: string, dayOfWeek: number) => {
@@ -615,12 +708,20 @@ export default function DepartmentResources() {
             
             <div>
               <Label htmlFor="faculty">Faculty *</Label>
-              <Input
-                id="faculty"
-                value={allocationForm.faculty}
-                onChange={(e) => setAllocationForm(prev => ({ ...prev, faculty: e.target.value }))}
-                placeholder="Enter faculty name"
-              />
+              <Select value={allocationForm.faculty} onValueChange={(value) => 
+                setAllocationForm(prev => ({ ...prev, faculty: value }))
+              }>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select faculty" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(new Set(courses.map(c => c.faculty))).map(facultyName => (
+                    <SelectItem key={facultyName} value={facultyName}>
+                      {facultyName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div>

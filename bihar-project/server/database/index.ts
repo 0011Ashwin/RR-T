@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const db = knex({
   client: 'better-sqlite3',
   connection: {
-    filename: path.join(__dirname, '..', '..', 'data', 'bihar_university.sqlite'),
+    filename: path.join(__dirname, 'bihar_university.sqlite'),
   },
   useNullAsDefault: true,
 });
@@ -27,6 +27,7 @@ export async function initializeDatabase() {
     db.schema.hasTable('timetable_entries'),
     db.schema.hasTable('resources'),
     db.schema.hasTable('classroom_bookings'),
+    db.schema.hasTable('booking_requests'),
   ]);
 
   if (!tablesExist[0]) {
@@ -146,6 +147,27 @@ export async function initializeDatabase() {
       table.integer('day_of_week').notNullable(); // 1-7 for Monday-Sunday
       table.date('booking_date').notNullable();
       table.string('status').defaultTo('confirmed'); // 'pending', 'confirmed', 'cancelled'
+      table.timestamps(true, true);
+    });
+  }
+
+  if (!tablesExist[8]) {
+    await db.schema.createTable('booking_requests', (table) => {
+      table.string('id').primary();
+      table.string('requesterId').notNullable();
+      table.string('requesterDepartment').notNullable();
+      table.string('targetResourceId').notNullable();
+      table.string('targetDepartment').notNullable();
+      table.string('timeSlotId').notNullable();
+      table.integer('dayOfWeek').notNullable();
+      table.string('courseName').notNullable();
+      table.string('purpose');
+      table.integer('expectedAttendance').notNullable();
+      table.string('requestDate').notNullable();
+      table.string('status').defaultTo('pending');
+      table.string('approvedBy');
+      table.string('responseDate');
+      table.string('notes');
       table.timestamps(true, true);
     });
   }

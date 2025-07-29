@@ -12,6 +12,9 @@ import { timetableRouter } from "./routes/timetable.js";
 import { resourceRouter } from "./routes/resource.js";
 import { classroomBookingRouter } from "./routes/classroom-booking.js";
 import { adminRouter } from "./routes/admin.js";
+import { bookingRequestRouter } from "./routes/booking-request.js";
+import { classSessionRouter } from "./routes/class-session.js";
+import { timeslotRouter } from "./routes/timeslot.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -27,18 +30,19 @@ export async function createServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Create data directory if it doesn't exist
+  const dataDir = path.join(__dirname, '..', 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    console.log('Data directory created at:', dataDir);
+  }
+
   // Initialize database
   try {
     await initializeDatabase();
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
-  }
-
-  // Create data directory if it doesn't exist
-  const dataDir = path.join(__dirname, '..', '..', 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
   }
 
   // Example API routes
@@ -57,7 +61,10 @@ export async function createServer() {
   app.use("/api/timetables", timetableRouter);
   app.use("/api/resources", resourceRouter);
   app.use("/api/classroom-bookings", classroomBookingRouter);
+  app.use("/api/booking-requests", bookingRequestRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/class-sessions", classSessionRouter);
+  app.use("/api/timeslots", timeslotRouter);
 
   return app;
 }

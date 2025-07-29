@@ -24,11 +24,26 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Fusion Starter server running on port ${port}`);
-  console.log(`📱 Frontend: http://localhost:${port}`);
-  console.log(`🔧 API: http://localhost:${port}/api`);
-});
+// Try to start the server with port fallback mechanism
+const startServer = (portToUse: number) => {
+  const server = app.listen(portToUse, () => {
+    console.log(`🚀 Fusion Starter server running on port ${portToUse}`);
+    console.log(`📱 Frontend: http://localhost:${portToUse}`);
+    console.log(`🔧 API: http://localhost:${portToUse}/api`);
+  });
+
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.log(`⚠️ Port ${portToUse} is already in use, trying port ${portToUse + 1}`);
+      startServer(portToUse + 1);
+    } else {
+      console.error('Server error:', error);
+    }
+  });
+};
+
+// Start the server with the initial port
+startServer(port as number);
 
 // Graceful shutdown
 process.on("SIGTERM", () => {

@@ -61,7 +61,8 @@ import {
   AlertTriangle,
   Copy,
   Archive,
-  RotateCcw
+  RotateCcw,
+  UserCheck
 } from 'lucide-react';
 import ResourceFilters, { type FilterState } from './ResourceFilters';
 import { exportResourceList } from './exportUtils';
@@ -184,7 +185,8 @@ export default function ResourceManagement() {
     isActive: true
   });
 
-  const currentUserDepartment = 'Computer Science'; // This would come from user context
+  // Define as a string to allow comparison with any department name
+  const currentUserDepartment: string = 'Computer Science'; // This would come from user context
 
   const filteredResources = useMemo(() => {
     return resources.filter(resource => {
@@ -361,6 +363,7 @@ export default function ResourceManagement() {
   };
 
   const canEditResource = (resource: Resource) => {
+    // Check if the resource is owned by the current user's department or if the user is an admin
     return resource.owningDepartment === currentUserDepartment || currentUserDepartment === 'Administration';
   };
 

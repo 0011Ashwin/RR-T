@@ -194,6 +194,13 @@ export default function CollegeDetails() {
             totalSeats: 120,
             currentStudents: 150,
             attendance: 91,
+            subjects: [
+              "Engineering Mechanics",
+              "Computer Science",
+              "Electronics",
+              "Mathematics",
+              "Physics"
+            ],
           },
           {
             name: "MBA",
@@ -202,6 +209,13 @@ export default function CollegeDetails() {
             totalSeats: 60,
             currentStudents: 80,
             attendance: 89,
+            subjects: [
+              "Finance",
+              "Marketing",
+              "Human Resources",
+              "Operations Management",
+              "Business Strategy"
+            ],
           },
           {
             name: "MCA",
@@ -210,6 +224,13 @@ export default function CollegeDetails() {
             totalSeats: 40,
             currentStudents: 45,
             attendance: 87,
+            subjects: [
+              "Advanced Programming",
+              "Database Systems",
+              "Software Engineering",
+              "Web Technologies",
+              "Data Science"
+            ],
           },
         ],
         facilities: [
@@ -225,6 +246,40 @@ export default function CollegeDetails() {
           absent: 52,
           late: 20,
           percentage: 89,
+        },
+        staff: {
+          teaching: [
+            {
+              name: "Dr. Anand Verma",
+              subject: "Engineering",
+              qualification: "Ph.D.",
+              experience: "15 years",
+            },
+            {
+              name: "Prof. Sanjay Gupta",
+              subject: "Management",
+              qualification: "MBA",
+              experience: "12 years",
+            },
+            {
+              name: "Dr. Meena Kumari",
+              subject: "Computer Science",
+              qualification: "Ph.D.",
+              experience: "10 years",
+            },
+          ],
+          nonTeaching: [
+            {
+              name: "Mr. Vijay Singh",
+              role: "Administrative Officer",
+              experience: "9 years",
+            },
+            {
+              name: "Ms. Ritu Sharma",
+              role: "Librarian",
+              experience: "7 years",
+            },
+          ],
         },
       },
       // Add more colleges as needed

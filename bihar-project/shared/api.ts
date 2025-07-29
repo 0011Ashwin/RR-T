@@ -104,3 +104,55 @@ export interface Faculty {
   designation: string;
   subjects: Subject[];
 }
+
+/**
+ * Booking Request related types and interfaces
+ */
+export interface BookingRequest {
+  id: string;
+  requesterId: string;
+  requesterDepartment: string;
+  targetResourceId: string;
+  targetDepartment: string;
+  timeSlotId: string;
+  dayOfWeek: number; // 0=Sunday, 1=Monday, etc.
+  courseName: string;
+  purpose?: string;
+  expectedAttendance: number;
+  requestDate: string;
+  status: 'pending' | 'approved' | 'rejected' | 'withdrawn';
+  approvedBy?: string;
+  responseDate?: string;
+  notes?: string;
+}
+
+export interface CreateBookingRequestRequest {
+  requesterId: string;
+  requesterDepartment: string;
+  targetResourceId: string;
+  targetDepartment: string;
+  timeSlotId: string;
+  dayOfWeek: number;
+  courseName: string;
+  purpose?: string;
+  expectedAttendance: number;
+}
+
+export interface UpdateBookingRequestStatusRequest {
+  status: 'approved' | 'rejected' | 'withdrawn';
+  notes?: string;
+  approvedBy?: string;
+}
+
+export interface BookingRequestResponse {
+  success: boolean;
+  data?: BookingRequest;
+  message?: string;
+}
+
+export interface BookingRequestListResponse {
+  success: boolean;
+  data?: BookingRequest[];
+  total?: number;
+  message?: string;
+}

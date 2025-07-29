@@ -1,4 +1,4 @@
-import { Routine, ClassSession, Course, Resource, DEFAULT_TIME_SLOTS } from '@shared/resource-types';
+import { Routine, ClassSession, Course, Resource, DEFAULT_TIME_SLOTS, BookingRequest } from '../../shared/resource-types';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -7,6 +7,7 @@ export interface ExportData {
   sessions?: ClassSession[];
   courses?: Course[];
   resources?: Resource[];
+  bookingRequests?: BookingRequest[];
 }
 
 // Generate CSV content for routine export
@@ -67,6 +68,39 @@ export const generateResourcesCSV = (resources: Resource[]): string => {
       `"${(resource.facilities || []).join('; ')}"`,
       resource.isShared ? 'Yes' : 'No',
       resource.isActive ? 'Active' : 'Inactive'
+    ];
+    csvContent += row.join(',') + '\n';
+  });
+
+  return csvContent;
+};
+
+// Generate CSV content for booking requests export
+export const generateBookingRequestsCSV = (bookingRequests: BookingRequest[]): string => {
+  const headers = [
+    'Request ID',
+    'Requester ID',
+    'Target Resource ID',
+    'Status',
+    'Request Date',
+    'Approved By',
+    'Notes',
+    'VC Approved',
+    'VC Response Date'
+  ];
+  let csvContent = headers.join(',') + '\n';
+
+  bookingRequests.forEach(request => {
+    const row = [
+      request.id.toString(),
+      request.requesterId.toString(),
+      request.targetResourceId.toString(),
+      request.status,
+      new Date(request.requestDate).toLocaleDateString(),
+      request.approvedBy || '',
+      `"${request.notes || ''}"`,
+      request.vcApproved ? 'Yes' : 'No',
+      request.vcResponseDate ? new Date(request.vcResponseDate).toLocaleDateString() : ''
     ];
     csvContent += row.join(',') + '\n';
   });

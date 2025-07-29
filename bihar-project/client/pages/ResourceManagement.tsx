@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHODAuth } from '@/hooks/use-hod-auth';
-import { Resource } from '@shared/resource-types';
+import { Resource } from '../../shared/resource-types';
 import { 
   Building2,
   Plus,
@@ -62,107 +62,23 @@ export default function ResourceManagement() {
     customFacility: '',
   });
 
-  // Initialize sample resources
+  // Fetch resources from API
   useEffect(() => {
-    const sampleResources: Resource[] = [
-      // Shared University Resources
-      {
-        id: 'shared_1',
-        name: 'Main Auditorium',
-        type: 'seminar_hall',
-        capacity: 500,
-        department: 'University',
-        location: 'Ground Floor, Main Building',
-        facilities: ['Projector', 'Audio System', 'AC', 'Stage', 'Microphone'],
-        isShared: true,
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-      },
-      {
-        id: 'shared_2',
-        name: 'Conference Hall A',
-        type: 'conference_room',
-        capacity: 50,
-        department: 'University',
-        location: 'First Floor, Admin Building',
-        facilities: ['Video Conferencing', 'Smart Board', 'AC', 'Tables', 'Chairs'],
-        isShared: true,
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-      },
-      {
-        id: 'shared_3',
-        name: 'Computer Lab - Central',
-        type: 'lab',
-        capacity: 60,
-        department: 'University',
-        location: 'Second Floor, IT Building',
-        facilities: ['60 Computers', 'Projector', 'Internet', 'AC', 'Tables'],
-        isShared: true,
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-      },
-      // Geography Department Resources
-      {
-        id: 'geo_1',
-        name: 'Geography Lab',
-        type: 'lab',
-        capacity: 40,
-        department: 'Geography',
-        location: 'Ground Floor, Geography Building',
-        facilities: ['Maps', 'Globes', 'Survey Equipment', 'Projector', 'Tables'],
-        isShared: false,
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-      },
-      {
-        id: 'geo_2',
-        name: 'Lecture Hall - Geography',
-        type: 'classroom',
-        capacity: 80,
-        department: 'Geography',
-        location: 'First Floor, Geography Building',
-        facilities: ['Projector', 'Smart Board', 'AC', 'Chairs'],
-        isShared: false,
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-      },
-      // Business Management Department Resources
-      {
-        id: 'biz_1',
-        name: 'Business Lab',
-        type: 'lab',
-        capacity: 50,
-        department: 'Business Management',
-        location: 'Ground Floor, Business Building',
-        facilities: ['Computers', 'Projector', 'Internet', 'AC', 'Tables'],
-        isShared: false,
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-      },
-      {
-        id: 'biz_2',
-        name: 'Lecture Hall - Business',
-        type: 'classroom',
-        capacity: 100,
-        department: 'Business Management',
-        location: 'First Floor, Business Building',
-        facilities: ['Projector', 'Smart Board', 'AC', 'Audio System', 'Chairs'],
-        isShared: false,
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-      },
-    ];
-    
-    setResources(sampleResources);
-    setFilteredResources(sampleResources);
+    const fetchResources = async () => {
+      try {
+        const response = await fetch('/api/resources');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setResources(data);
+        setFilteredResources(data);
+      } catch (error) {
+        console.error('Error fetching resources:', error);
+        setErrors(['Failed to load resources. Please try again later.']);
+      }
+    };
+    fetchResources();
   }, []);
 
   // Filter resources based on search and filters
@@ -251,7 +167,7 @@ export default function ResourceManagement() {
     return errors;
   };
 
-  const saveResource = () => {
+  const saveResource = async () => {
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
@@ -278,41 +194,99 @@ export default function ResourceManagement() {
         updatedAt: new Date().toISOString(),
       };
       
-      setResources(prev => prev.map(r => r.id === editingResource.id ? updatedResource : r));
+      try {
+        const response = await fetch(`/api/resources/${editingResource.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedResource),
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const updatedResourceFromServer = await response.json();
+        setResources(prev => prev.map(r => r.id === updatedResourceFromServer.id ? updatedResourceFromServer : r));
+        setErrors([]);
+      } catch (error) {
+        console.error('Error updating resource:', error);
+        setErrors(['Failed to update resource. Please try again.']);
+        return;
+      }
     } else {
-      // Create new resource
-      const newResource: Resource = {
-        ...resourceData,
-        id: `resource_${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      setResources(prev => [...prev, newResource]);
+      // Create new resource via API
+      try {
+        const response = await fetch('/api/resources', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(resourceData),
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const newResource = await response.json();
+        setResources(prev => [...prev, newResource]);
+        setErrors([]); // Clear errors on success
+      } catch (error) {
+        console.error('Error creating resource:', error);
+        setErrors(['Failed to create resource. Please try again.']);
+        return; // Prevent dialog from closing on error
+      }
     }
 
     setEditDialogOpen(false);
   };
 
-  const deleteResource = (resource: Resource) => {
+  const deleteResource = async (resource: Resource) => {
     if (resource.department !== currentHOD?.department && !resource.isShared) {
       alert('You can only delete resources from your own department.');
       return;
     }
 
     if (confirm(`Are you sure you want to delete "${resource.name}"?`)) {
-      setResources(prev => prev.filter(r => r.id !== resource.id));
+      try {
+        const response = await fetch(`/api/resources/${resource.id}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        setResources(prev => prev.filter(r => r.id !== resource.id));
+        setErrors([]);
+      } catch (error) {
+        console.error('Error deleting resource:', error);
+        setErrors(['Failed to delete resource. Please try again.']);
+      }
     }
   };
 
-  const toggleResourceStatus = (resource: Resource) => {
+  const toggleResourceStatus = async (resource: Resource) => {
     const updatedResource = {
       ...resource,
       isActive: !resource.isActive,
       updatedAt: new Date().toISOString(),
     };
     
-    setResources(prev => prev.map(r => r.id === resource.id ? updatedResource : r));
+    try {
+      const response = await fetch(`/api/resources/${resource.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedResource),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const updatedResourceFromServer = await response.json();
+      setResources(prev => prev.map(r => r.id === updatedResourceFromServer.id ? updatedResourceFromServer : r));
+      setErrors([]);
+    } catch (error) {
+      console.error('Error toggling resource status:', error);
+      setErrors(['Failed to update resource status. Please try again.']);
+    }
   };
 
   const addFacility = () => {

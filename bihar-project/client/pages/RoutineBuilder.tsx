@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import axios from 'axios';
 import { useHODAuth } from '@/hooks/use-hod-auth';
 import { Routine, ClassSession, Course, Resource, DEFAULT_TIME_SLOTS } from '@shared/resource-types';
+import { exportRoutine } from '@/lib/export-utils';
 import { 
   Calendar,
   Download,
@@ -30,8 +32,8 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 interface RoutineView {
   semester: number;
   section: string;
-  course: Course;
   sessions: ClassSession[];
+  course?: Course;
 }
 
 export default function RoutineBuilder() {
@@ -52,183 +54,108 @@ export default function RoutineBuilder() {
     academicYear: '2024-25',
   });
 
-  // Sample data initialization
   useEffect(() => {
     if (!currentHOD) return;
 
-    // Generate sample resources and courses based on department
-    const departmentResources: Resource[] = 
-      currentHOD.department === 'Geography' ? [
-        {
-          id: 'geo_1',
-          name: 'Geography Lab',
-          type: 'lab',
-          capacity: 40,
-          department: 'Geography',
-          location: 'Ground Floor, Geography Building',
-          facilities: ['Maps', 'Globes', 'Survey Equipment', 'Projector'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-        {
-          id: 'geo_2',
-          name: 'Lecture Hall - Geography',
-          type: 'classroom',
-          capacity: 80,
-          department: 'Geography',
-          location: 'First Floor, Geography Building',
-          facilities: ['Projector', 'Smart Board', 'AC'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-      ] : [
-        {
-          id: 'biz_1',
-          name: 'Business Lab',
-          type: 'lab',
-          capacity: 50,
-          department: 'Business Management',
-          location: 'Ground Floor, Business Building',
-          facilities: ['Computers', 'Projector', 'Internet'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-        {
-          id: 'biz_2',
-          name: 'Lecture Hall - Business',
-          type: 'classroom',
-          capacity: 100,
-          department: 'Business Management',
-          location: 'First Floor, Business Building',
-          facilities: ['Projector', 'Smart Board', 'AC'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-      ];
+    const fetchRoutines = async () => {
+      try {
+        const response = await axios.get('/api/timetables');
+        const fetchedRoutines: Routine[] = response.data.map((rt: any) => ({
+          id: rt.id,
+          name: rt.name,
+          department: currentHOD?.department || 'Unknown',
+          semester: rt.semester,
+          section: rt.section,
+          academicYear: rt.academic_year,
+          sessions: rt.entries.map((entry: any) => ({
+            id: entry.id,
+            courseId: entry.subject_id.toString(),
+            resourceId: entry.classroom_id.toString(),
+            faculty: entry.faculty_id.toString(),
+            dayOfWeek: entry.day_of_week,
+            timeSlotId: DEFAULT_TIME_SLOTS.find(t => t.start === entry.start_time && t.end === entry.end_time)?.id || '',
+            type: 'theory', // Assuming default type, adjust if type is available in backend
+          })),
+          isActive: rt.is_active,
+          generatedAt: rt.created_at,
+          createdAt: rt.created_at,
+          updatedAt: rt.updated_at,
+        }));
+        setRoutines(fetchedRoutines);
+        updateRoutineViews(fetchedRoutines);
+      } catch (error) {
+        console.error('Error fetching routines:', error);
+      }
+    };
 
-    const departmentCourses: Course[] = 
-      currentHOD.department === 'Geography' ? [
-        {
-          id: 'geo_course_1',
-          name: 'Physical Geography',
-          code: 'GEO101',
-          department: 'Geography',
-          semester: 1,
-          section: 'A',
-          faculty: 'Dr. Kumar Singh',
-          weeklyHours: 4,
-          expectedSize: 35,
-          type: 'theory',
-          isActive: true,
-        },
-        {
-          id: 'geo_course_2',
-          name: 'Human Geography',
-          code: 'GEO102',
-          department: 'Geography',
-          semester: 1,
-          section: 'A',
-          faculty: 'Prof. Sharma',
-          weeklyHours: 3,
-          expectedSize: 35,
-          type: 'theory',
-          isActive: true,
-        },
-        {
-          id: 'geo_course_3',
-          name: 'Cartography Lab',
-          code: 'GEO103',
-          department: 'Geography',
-          semester: 1,
-          section: 'A',
-          faculty: 'Dr. Verma',
-          weeklyHours: 2,
-          expectedSize: 20,
-          type: 'practical',
-          isActive: true,
-        },
-      ] : [
-        {
-          id: 'biz_course_1',
-          name: 'Business Management',
-          code: 'BIZ101',
-          department: 'Business Management',
-          semester: 1,
-          section: 'A',
-          faculty: 'Dr. Priya Sharma',
-          weeklyHours: 4,
-          expectedSize: 45,
-          type: 'theory',
-          isActive: true,
-        },
-        {
-          id: 'biz_course_2',
-          name: 'Marketing Management',
-          code: 'BIZ201',
-          department: 'Business Management',
-          semester: 1,
-          section: 'A',
-          faculty: 'Prof. Agarwal',
-          weeklyHours: 3,
-          expectedSize: 40,
-          type: 'theory',
-          isActive: true,
-        },
-      ];
+    fetchRoutines();
 
-    setResources(departmentResources);
-    setCourses(departmentCourses);
 
-    // Generate a sample routine
-    generateSampleRoutine(departmentCourses, departmentResources);
+
+    const fetchResources = async () => {
+      try {
+        const response = await axios.get('/api/resources');
+        setResources(response.data);
+      } catch (error) {
+        console.error('Error fetching resources:', error);
+      }
+    };
+
+    const fetchCourses = async () => {
+      try {
+        const response = await axios.get('/api/subjects'); // Assuming /api/subjects is the endpoint for courses
+        setCourses(response.data);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+      }
+    };
+
+    fetchResources();
+    fetchCourses();
+
+    // The sample routine generation will need to be updated to use fetched data
+    // For now, we'll keep it commented out or modify it to run after data is fetched.
+    // generateRoutine();
   }, [currentHOD]);
 
-  const generateSampleRoutine = (courses: Course[], resources: Resource[]) => {
-    if (!currentHOD) return;
+  useEffect(() => {
+    updateRoutineViews(routines);
+  }, [routines, courses, resources]);
 
+  const autoGenerateSessions = (coursesToSchedule: Course[], availableResources: Resource[]): ClassSession[] => {
     const sessions: ClassSession[] = [];
     let sessionId = 1;
 
     // Auto-allocate courses to available slots
-    courses.forEach(course => {
+    coursesToSchedule.forEach(course => {
       let hoursScheduled = 0;
       
-      for (let day = 1; day <= 5 && hoursScheduled < course.weeklyHours; day++) {
+      for (let day = 1; day <= 5 && hoursScheduled < course.weeklyHours; day++) { // Monday to Friday
         for (let timeIndex = 0; timeIndex < DEFAULT_TIME_SLOTS.length && hoursScheduled < course.weeklyHours; timeIndex++) {
           const timeSlot = DEFAULT_TIME_SLOTS[timeIndex];
           
-          // Find suitable resource
-          const suitableResource = resources.find(resource => {
+          const suitableResource = availableResources.find(resource => {
             const hasCapacity = resource.capacity >= course.expectedSize;
             const isRightType = (course.type === 'practical' && resource.type === 'lab') ||
                               (course.type === 'theory' && (resource.type === 'classroom' || resource.type === 'seminar_hall'));
             
-            // Check if slot is available
             const isSlotFree = !sessions.some(s => 
-              s.resourceId === resource.id && 
-              s.timeSlotId === timeSlot.id && 
-              s.dayOfWeek === day
+              s.resource.id === resource.id && 
+              s.timeSlot === `${timeSlot.start} - ${timeSlot.end}` && 
+              s.day === DAYS[day - 1]
             );
             
             return hasCapacity && isRightType && isSlotFree;
           });
-
+           
           if (suitableResource) {
             sessions.push({
               id: `session_${sessionId++}`,
               courseId: course.id,
-              resourceId: suitableResource.id,
-              timeSlotId: timeSlot.id,
-              dayOfWeek: day,
+              resourceId: suitableResource.id!,
               faculty: course.faculty,
+              dayOfWeek: day,
+              timeSlotId: timeSlot.id,
               type: course.type,
             });
             hoursScheduled++;
@@ -236,24 +163,7 @@ export default function RoutineBuilder() {
         }
       }
     });
-
-    const sampleRoutine: Routine = {
-      id: 'routine_1',
-      name: `${currentHOD.department} - Semester 1, Section A`,
-      department: currentHOD.department,
-      semester: 1,
-      section: 'A',
-      academicYear: '2024-25',
-      sessions,
-      generatedBy: currentHOD.id,
-      generatedAt: new Date().toISOString(),
-      isActive: true,
-      version: 1,
-    };
-
-    setRoutines([sampleRoutine]);
-    setSelectedRoutine(sampleRoutine);
-    updateRoutineViews([sampleRoutine]);
+    return sessions;
   };
 
   const updateRoutineViews = (routines: Routine[]) => {
@@ -276,7 +186,6 @@ export default function RoutineBuilder() {
           views.push({
             semester: routine.semester,
             section: routine.section || 'A',
-            course,
             sessions,
           });
         }
@@ -286,93 +195,121 @@ export default function RoutineBuilder() {
     setRoutineViews(views);
   };
 
-  const createNewRoutine = () => {
-    if (!currentHOD) return;
-
-    const filteredCourses = courses.filter(c => 
-      c.semester === newRoutineForm.semester && 
-      c.section === newRoutineForm.section
-    );
-
-    if (filteredCourses.length === 0) {
-      alert('No courses found for the selected semester and section.');
+  const createNewRoutine = async () => {
+    if (!newRoutineForm.name || !newRoutineForm.academicYear) {
+      alert('Please fill in all required fields.');
       return;
     }
 
-    const sessions: ClassSession[] = [];
-    let sessionId = Date.now();
+    // Check if a routine with the same semester, section, and academic year already exists
+    const existingRoutine = routines.find(r => 
+      r.semester === newRoutineForm.semester &&
+      r.section === newRoutineForm.section &&
+      r.academicYear === newRoutineForm.academicYear
+    );
+
+    if (existingRoutine) {
+      alert('A routine for this semester, section, and academic year already exists.');
+      return;
+    }
+
+    // Filter courses and resources relevant to the new routine's department
+    const relevantCourses = courses.filter(c => 
+      c.department === currentHOD?.department &&
+      c.semester === newRoutineForm.semester &&
+      c.section === newRoutineForm.section
+    );
+    const relevantResources = resources.filter(r => 
+      r.department === currentHOD?.department || r.isShared
+    );
 
     // Auto-generate routine for the new configuration
-    filteredCourses.forEach(course => {
-      let hoursScheduled = 0;
-      
-      for (let day = 1; day <= 5 && hoursScheduled < course.weeklyHours; day++) {
-        for (let timeIndex = 0; timeIndex < DEFAULT_TIME_SLOTS.length && hoursScheduled < course.weeklyHours; timeIndex++) {
-          const timeSlot = DEFAULT_TIME_SLOTS[timeIndex];
-          
-          const suitableResource = resources.find(resource => {
-            const hasCapacity = resource.capacity >= course.expectedSize;
-            const isRightType = (course.type === 'practical' && resource.type === 'lab') ||
-                              (course.type === 'theory' && (resource.type === 'classroom' || resource.type === 'seminar_hall'));
-            
-            const isSlotFree = !sessions.some(s => 
-              s.resourceId === resource.id && 
-              s.timeSlotId === timeSlot.id && 
-              s.dayOfWeek === day
-            );
-            
-            return hasCapacity && isRightType && isSlotFree;
-          });
+    const generatedSessions = autoGenerateSessions(relevantCourses, relevantResources);
 
-          if (suitableResource) {
-            sessions.push({
-              id: `session_${sessionId++}`,
-              courseId: course.id,
-              resourceId: suitableResource.id,
-              timeSlotId: timeSlot.id,
-              dayOfWeek: day,
-              faculty: course.faculty,
-              type: course.type,
-            });
-            hoursScheduled++;
-          }
-        }
-      }
-    });
-
-    const newRoutine: Routine = {
-      id: `routine_${Date.now()}`,
+    const newTimetableData = {
       name: newRoutineForm.name,
-      department: currentHOD.department,
       semester: newRoutineForm.semester,
+      department_id: currentHOD?.department_id || 0, // Assuming department_id is available in currentHOD
       section: newRoutineForm.section,
-      academicYear: newRoutineForm.academicYear,
-      sessions,
-      generatedBy: currentHOD.id,
-      generatedAt: new Date().toISOString(),
-      isActive: true,
-      version: 1,
+      academic_year: newRoutineForm.academicYear,
+      is_active: true,
+      entries: generatedSessions.map(session => ({
+        subject_id: parseInt(session.courseId),
+        faculty_id: parseInt(session.faculty),
+        classroom_id: parseInt(session.resourceId),
+        day_of_week: session.dayOfWeek,
+        start_time: DEFAULT_TIME_SLOTS.find(t => t.id === session.timeSlotId)?.start || '',
+        end_time: DEFAULT_TIME_SLOTS.find(t => t.id === session.timeSlotId)?.end || '',
+      })),
     };
 
-    const updatedRoutines = [...routines, newRoutine];
-    setRoutines(updatedRoutines);
-    setSelectedRoutine(newRoutine);
-    updateRoutineViews(updatedRoutines);
-    
-    setCreateDialogOpen(false);
-    setNewRoutineForm({
-      name: '',
-      semester: 1,
-      section: 'A',
-      academicYear: '2024-25',
-    });
+    try {
+      const response = await axios.post('/api/timetables', newTimetableData);
+
+      const createdTimetable = response.data;
+      // Convert the created timetable back to the Routine format for frontend state
+      const newRoutine: Routine = {
+        id: createdTimetable.id,
+        name: createdTimetable.name,
+        department: currentHOD?.department || 'Unknown',
+        semester: createdTimetable.semester,
+        section: createdTimetable.section,
+        academicYear: createdTimetable.academic_year,
+        sessions: createdTimetable.entries.map((entry: any) => {
+          const course = relevantCourses.find(c => c.id === entry.subject_id.toString());
+          const resource = relevantResources.find(r => r.id === entry.classroom_id.toString());
+          const faculty = { id: entry.faculty_id.toString(), name: 'Unknown Faculty' }; // You might need to fetch faculty details
+
+          return {
+            id: entry.id,
+            course: course || { id: '', name: 'Unknown Course', code: '', department: '', semester: 0, section: '', faculty: '', weeklyHours: 0, expectedSize: 0, type: 'theory', isActive: true },
+            resource: resource || { id: '', name: 'Unknown Resource', type: 'classroom', capacity: 0, department: '', location: '', facilities: [], isShared: false, isActive: true, createdAt: '', updatedAt: '' },
+            faculty: faculty,
+            day: DAYS[entry.day_of_week - 1],
+            timeSlot: `${entry.start_time} - ${entry.end_time}`,
+          };
+        }),
+        isActive: createdTimetable.is_active,
+        generatedAt: createdTimetable.created_at,
+        createdAt: createdTimetable.created_at,
+        updatedAt: createdTimetable.updated_at,
+      };
+
+      const updatedRoutines = [...routines, newRoutine];
+      setRoutines(updatedRoutines);
+      setSelectedRoutine(newRoutine);
+      updateRoutineViews(updatedRoutines);
+
+      setCreateDialogOpen(false);
+      setNewRoutineForm({
+        name: '',
+        semester: 1,
+        section: 'A',
+        academicYear: '2024-25',
+      });
+    } catch (error) {
+      console.error('Error creating routine:', error);
+      alert('Failed to create routine. Please try again.');
+    }
   };
 
-  const exportRoutine = (format: 'pdf' | 'excel') => {
+  const handleExportRoutine = (format: 'pdf' | 'excel') => {
     if (!selectedRoutine) return;
     
-    // In a real implementation, this would trigger actual export
-    alert(`Exporting ${selectedRoutine.name} as ${format.toUpperCase()}...`);
+    // Prepare the export data
+    const exportData = {
+      routine: selectedRoutine,
+      sessions: selectedRoutine.sessions,
+      courses: courses,
+      resources: resources
+    };
+    
+    // Use the imported exportRoutine functions
+    if (format === 'pdf') {
+      exportRoutine.toPDF(exportData);
+    } else if (format === 'excel') {
+      exportRoutine.toCSV(exportData);
+    }
   };
 
   const getResourceName = (resourceId: string) => {
@@ -383,9 +320,33 @@ export default function RoutineBuilder() {
     return DEFAULT_TIME_SLOTS.find(t => t.id === timeSlotId)?.label || 'Unknown Time';
   };
 
-  const filteredViews = routineViews.filter(view => 
-    view.semester === selectedSemester && view.section === selectedSection
-  );
+  const filteredViews = useMemo(() => {
+    return routines.filter(routine =>
+      routine.semester === selectedSemester && routine.section === selectedSection
+    ).flatMap(routine => {
+      const courseGroups = new Map<string, ClassSession[]>();
+      routine.sessions.forEach(session => {
+        if (!courseGroups.has(session.courseId)) {
+          courseGroups.set(session.courseId, []);
+        }
+        courseGroups.get(session.courseId)!.push(session);
+      });
+
+      const views: RoutineView[] = [];
+      courseGroups.forEach((sessions, courseId) => {
+        const course = courses.find(c => c.id === courseId);
+        if (course) {
+          views.push({
+            semester: routine.semester,
+            section: routine.section || 'A',
+            sessions,
+            course,
+          });
+        }
+      });
+      return views;
+    });
+  }, [routines, selectedSemester, selectedSection, courses]);
 
   return (
     <div className="space-y-6">
@@ -578,7 +539,7 @@ export default function RoutineBuilder() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => exportRoutine('pdf')}
+                  onClick={() => handleExportRoutine('pdf')}
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   Export PDF
@@ -586,7 +547,7 @@ export default function RoutineBuilder() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => exportRoutine('excel')}
+                  onClick={() => handleExportRoutine('excel')}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export Excel

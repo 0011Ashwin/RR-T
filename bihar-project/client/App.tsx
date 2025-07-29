@@ -1,7 +1,4 @@
-import "./global.css";
-
 import { Toaster } from "@/components/ui/toaster";
-import { createRoot } from "react-dom/client";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,6 +15,7 @@ import Resources from "./pages/Resources";
 import RoutineBuilder from "./pages/RoutineBuilder";
 import ResourceManagement from "./pages/ResourceManagement";
 import BookingRequests from "./pages/BookingRequests";
+import VCResourceApprovals from "./pages/VCResourceApprovals";
 import CollegeDetails from "./pages/CollegeDetails";
 import TeachingStaff from "./pages/TeachingStaff";
 import NonTeachingStaff from "./pages/NonTeachingStaff";
@@ -41,6 +39,7 @@ const App = () => (
             <Route path="/routine-builder" element={<RoutineBuilder />} />
             <Route path="/resource-management" element={<ResourceManagement />} />
             <Route path="/booking-requests" element={<BookingRequests />} />
+            <Route path="/vc-resource-approvals" element={<VCResourceApprovals />} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/college/:collegeName" element={<CollegeDetails />} />
             <Route path="/staff/teaching" element={<TeachingStaff />} />
@@ -54,4 +53,4 @@ const App = () => (
   </QueryClientProvider>
 );
 
-createRoot(document.getElementById("root")!).render(<App />);
+export default App;

@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHODAuth } from '@/hooks/use-hod-auth';
-import { Resource, WeeklyTimeSlot, BookingRequest, ClassSession, Course, DEFAULT_TIME_SLOTS } from '@shared/resource-types';
+import { Resource, WeeklyTimeSlot, BookingRequest, ClassSession, Course, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
 import { 
   Building2, 
   Calendar, 
@@ -93,799 +93,1147 @@ export default function Resources() {
   const { currentHOD } = useHODAuth();
   const [selectedDay, setSelectedDay] = useState(1); // Monday
   const [departmentResources, setDepartmentResources] = useState<Resource[]>([]);
-  const [universityResources] = useState<Resource[]>(SAMPLE_SHARED_RESOURCES);
+  const [universityResources, setUniversityResources] = useState<Resource[]>([]);
   const [departmentSlots, setDepartmentSlots] = useState<WeeklyTimeSlot[]>([]);
   const [universitySlots, setUniversitySlots] = useState<WeeklyTimeSlot[]>([]);
   const [classSessions, setClassSessions] = useState<ClassSession[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  
+  // Booking request state
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
+  const [bookingForm, setBookingForm] = useState({
+    resourceId: '',
+    purpose: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    attendees: '',
+    notes: '',
+  });
+  
+  // UI state
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
-  const [selectedResourceForBooking, setSelectedResourceForBooking] = useState<Resource | null>(null);
-  const [selectedSlotForAllocation, setSelectedSlotForAllocation] = useState<{
+  const [selectedSlot, setSelectedSlot] = useState<{
     resourceId: string;
     timeSlotId: string;
     dayOfWeek: number;
   } | null>(null);
-  const [conflicts, setConflicts] = useState<string[]>([]);
-
-  const [bookingForm, setBookingForm] = useState({
-    timeSlotId: '',
-    courseName: '',
-    purpose: '',
-    expectedAttendance: '',
-  });
-
+  
   const [allocationForm, setAllocationForm] = useState({
     courseId: '',
     faculty: '',
     type: 'theory' as 'theory' | 'practical' | 'tutorial' | 'seminar',
   });
+  
+  const [conflicts, setConflicts] = useState<string[]>([]);
 
-  // Initialize data based on current HOD
+  // Load resources and bookings
   useEffect(() => {
     if (!currentHOD) return;
+    
+    // Simulate API call
+    setTimeout(() => {
+      try {
+        // Set university resources
+        setUniversityResources(SAMPLE_SHARED_RESOURCES);
+        
+        // Generate department resources based on HOD department
+        const deptResources: Resource[] = 
+          currentHOD.department === 'Geography' ? [
+            {
+              id: 'geo_1',
+              name: 'Geography Lab',
+              type: 'lab',
+              capacity: 40,
+              department: 'Geography',
+              location: 'First Floor, Science Building',
+              facilities: ['Maps', 'GIS Workstations', 'Projector'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+            {
+              id: 'geo_2',
+              name: 'Lecture Hall - Geography',
+              type: 'classroom',
+              capacity: 80,
+              department: 'Geography',
+              location: 'Second Floor, Science Building',
+              facilities: ['Projector', 'Smart Board', 'AC'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+            {
+              id: 'geo_3',
+              name: 'Field Equipment Room',
+              type: 'lab',
+              capacity: 20,
+              department: 'Geography',
+              location: 'Ground Floor, Science Building',
+              facilities: ['Survey Equipment', 'Storage Cabinets'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+          ] : currentHOD.department === 'Computer Science' ? [
+            {
+              id: 'cs_1',
+              name: 'Computer Lab A',
+              type: 'lab',
+              capacity: 60,
+              department: 'Computer Science',
+              location: 'First Floor, Tech Building',
+              facilities: ['Computers', 'Projector', 'Internet', 'Development Software'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+            {
+              id: 'cs_2',
+              name: 'Computer Lab B',
+              type: 'lab',
+              capacity: 40,
+              department: 'Computer Science',
+              location: 'First Floor, Tech Building',
+              facilities: ['Computers', 'Projector', 'Internet', 'Networking Equipment'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+            {
+              id: 'cs_3',
+              name: 'Lecture Hall - CS',
+              type: 'classroom',
+              capacity: 100,
+              department: 'Computer Science',
+              location: 'Second Floor, Tech Building',
+              facilities: ['Projector', 'Smart Board', 'AC', 'Audio System'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+          ] : [
+            {
+              id: 'biz_1',
+              name: 'Business Lab',
+              type: 'lab',
+              capacity: 50,
+              department: 'Business Management',
+              location: 'Ground Floor, Business Building',
+              facilities: ['Computers', 'Projector', 'Internet', 'Presentation Tools'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+            {
+              id: 'biz_2',
+              name: 'Lecture Hall - Business',
+              type: 'classroom',
+              capacity: 100,
+              department: 'Business Management',
+              location: 'First Floor, Business Building',
+              facilities: ['Projector', 'Smart Board', 'AC', 'Audio System'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+            {
+              id: 'biz_3',
+              name: 'Conference Room - Business',
+              type: 'conference_room',
+              capacity: 25,
+              department: 'Business Management',
+              location: 'Second Floor, Business Building',
+              facilities: ['Video Conferencing', 'Projector', 'Whiteboard'],
+              isShared: false,
+              isActive: true,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+          ];
 
-    // Generate department resources based on HOD's department
-    const deptResources: Resource[] = 
-      currentHOD.department === 'Geography' ? [
-        {
-          id: 'geo_1',
-          name: 'Geography Lab',
-          type: 'lab',
-          capacity: 40,
-          department: 'Geography',
-          location: 'Ground Floor, Geography Building',
-          facilities: ['Maps', 'Globes', 'Survey Equipment', 'Projector'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-        {
-          id: 'geo_2',
-          name: 'Lecture Hall - Geography',
-          type: 'classroom',
-          capacity: 80,
-          department: 'Geography',
-          location: 'First Floor, Geography Building',
-          facilities: ['Projector', 'Smart Board', 'AC'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-        {
-          id: 'geo_3',
-          name: 'Seminar Room - Geography',
-          type: 'seminar_hall',
-          capacity: 30,
-          department: 'Geography',
-          location: 'Second Floor, Geography Building',
-          facilities: ['Projector', 'Whiteboard'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-      ] : [
-        {
-          id: 'biz_1',
-          name: 'Business Lab',
-          type: 'lab',
-          capacity: 50,
-          department: 'Business Management',
-          location: 'Ground Floor, Business Building',
-          facilities: ['Computers', 'Projector', 'Internet', 'Presentation Tools'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-        {
-          id: 'biz_2',
-          name: 'Lecture Hall - Business',
-          type: 'classroom',
-          capacity: 100,
-          department: 'Business Management',
-          location: 'First Floor, Business Building',
-          facilities: ['Projector', 'Smart Board', 'AC', 'Audio System'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-        {
-          id: 'biz_3',
-          name: 'Conference Room - Business',
-          type: 'conference_room',
-          capacity: 25,
-          department: 'Business Management',
-          location: 'Second Floor, Business Building',
-          facilities: ['Video Conferencing', 'Projector', 'Whiteboard'],
-          isShared: false,
-          isActive: true,
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-      ];
+        setDepartmentResources(deptResources);
 
-    setDepartmentResources(deptResources);
+        // Generate sample courses
+        const deptCourses: Course[] = 
+          currentHOD.department === 'Geography' ? [
+            {
+              id: 'geo_course_1',
+              name: 'Physical Geography',
+              code: 'GEO101',
+              department: 'Geography',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Kumar Singh',
+              weeklyHours: 4,
+              expectedSize: 35,
+              type: 'theory',
+              isActive: true,
+            },
+            {
+              id: 'geo_course_2',
+              name: 'Human Geography',
+              code: 'GEO102',
+              department: 'Geography',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Priya Sharma',
+              weeklyHours: 4,
+              expectedSize: 40,
+              type: 'theory',
+              isActive: true,
+            },
+            {
+              id: 'geo_course_3',
+              name: 'GIS Practical',
+              code: 'GEO103',
+              department: 'Geography',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Amit Singh',
+              weeklyHours: 2,
+              expectedSize: 30,
+              type: 'practical',
+              isActive: true,
+            },
+          ] : currentHOD.department === 'Computer Science' ? [
+            {
+              id: 'cs_course_1',
+              name: 'Introduction to Programming',
+              code: 'CS101',
+              department: 'Computer Science',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Rajesh Kumar',
+              weeklyHours: 4,
+              expectedSize: 60,
+              type: 'theory',
+              isActive: true,
+            },
+            {
+              id: 'cs_course_2',
+              name: 'Data Structures',
+              code: 'CS102',
+              department: 'Computer Science',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Neha Gupta',
+              weeklyHours: 4,
+              expectedSize: 55,
+              type: 'theory',
+              isActive: true,
+            },
+            {
+              id: 'cs_course_3',
+              name: 'Programming Lab',
+              code: 'CS103',
+              department: 'Computer Science',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Amit Singh',
+              weeklyHours: 2,
+              expectedSize: 60,
+              type: 'practical',
+              isActive: true,
+            },
+          ] : [
+            {
+              id: 'biz_course_1',
+              name: 'Principles of Management',
+              code: 'BM101',
+              department: 'Business Management',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Sunita Rani',
+              weeklyHours: 4,
+              expectedSize: 45,
+              type: 'theory',
+              isActive: true,
+            },
+            {
+              id: 'biz_course_2',
+              name: 'Business Economics',
+              code: 'BM102',
+              department: 'Business Management',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Rajiv Sharma',
+              weeklyHours: 4,
+              expectedSize: 50,
+              type: 'theory',
+              isActive: true,
+            },
+            {
+              id: 'biz_course_3',
+              name: 'Business Communication',
+              code: 'BM103',
+              department: 'Business Management',
+              semester: 1,
+              section: 'A',
+              faculty: 'Dr. Priya Verma',
+              weeklyHours: 2,
+              expectedSize: 45,
+              type: 'practical',
+              isActive: true,
+            },
+          ];
 
-    // Generate sample courses
-    const deptCourses: Course[] = 
-      currentHOD.department === 'Geography' ? [
-        {
-          id: 'geo_course_1',
-          name: 'Physical Geography',
-          code: 'GEO101',
-          department: 'Geography',
-          semester: 1,
-          section: 'A',
-          faculty: 'Dr. Kumar Singh',
-          weeklyHours: 4,
-          expectedSize: 35,
-          type: 'theory',
-          isActive: true,
-        },
-        {
-          id: 'geo_course_2',
-          name: 'Human Geography',
-          code: 'GEO102',
-          department: 'Geography',
-          semester: 1,
-          section: 'A',
-          faculty: 'Prof. Sharma',
-          weeklyHours: 3,
-          expectedSize: 35,
-          type: 'theory',
-          isActive: true,
-        },
-        {
-          id: 'geo_course_3',
-          name: 'Cartography Lab',
-          code: 'GEO103',
-          department: 'Geography',
-          semester: 2,
-          section: 'A',
-          faculty: 'Dr. Verma',
-          weeklyHours: 2,
-          expectedSize: 20,
-          type: 'practical',
-          isActive: true,
-        },
-      ] : [
-        {
-          id: 'biz_course_1',
-          name: 'Business Management',
-          code: 'BIZ101',
-          department: 'Business Management',
-          semester: 1,
-          section: 'A',
-          faculty: 'Dr. Priya Sharma',
-          weeklyHours: 4,
-          expectedSize: 45,
-          type: 'theory',
-          isActive: true,
-        },
-        {
-          id: 'biz_course_2',
-          name: 'Marketing Management',
-          code: 'BIZ201',
-          department: 'Business Management',
-          semester: 2,
-          section: 'A',
-          faculty: 'Prof. Agarwal',
-          weeklyHours: 3,
-          expectedSize: 40,
-          type: 'theory',
-          isActive: true,
-        },
-        {
-          id: 'biz_course_3',
-          name: 'Business Analytics Lab',
-          code: 'BIZ301',
-          department: 'Business Management',
-          semester: 3,
-          section: 'A',
-          faculty: 'Dr. Gupta',
-          weeklyHours: 2,
-          expectedSize: 25,
-          type: 'practical',
-          isActive: true,
-        },
-      ];
+        setCourses(deptCourses);
 
-    setCourses(deptCourses);
+        // Generate weekly slots
+        generateWeeklySlots(deptResources, SAMPLE_SHARED_RESOURCES);
 
-    // Generate weekly slots for both department and university resources
-    generateWeeklySlots(deptResources, universityResources);
+        // Generate sample class sessions
+        generateSampleSessions(deptResources, deptCourses);
+
+        // Generate sample booking requests
+        generateSampleBookingRequests();
+
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to load resources. Please try again.');
+        setLoading(false);
+      }
+    }, 1000);
   }, [currentHOD]);
 
+  // Generate weekly time slots for resources
   const generateWeeklySlots = (deptResources: Resource[], uniResources: Resource[]) => {
+    // Department resources slots
     const deptSlots: WeeklyTimeSlot[] = [];
-    const uniSlots: WeeklyTimeSlot[] = [];
-    
-    // Generate department resource slots
     deptResources.forEach(resource => {
       DEFAULT_TIME_SLOTS.forEach(timeSlot => {
-        [1, 2, 3, 4, 5].forEach(day => {
+        [1, 2, 3, 4, 5].forEach(day => { // Monday to Friday
           deptSlots.push({
-            id: `dept_slot_${resource.id}_${timeSlot.id}_${day}`,
+            id: `${resource.id}_${timeSlot.id}_${day}`,
             resourceId: resource.id,
             timeSlotId: timeSlot.id,
             dayOfWeek: day,
-            isOccupied: false,
-            bookingDate: new Date().toISOString(),
+            isAvailable: true,
           });
         });
       });
     });
+    setDepartmentSlots(deptSlots);
 
-    // Generate university resource slots with some sample bookings
+    // University resources slots
+    const uniSlots: WeeklyTimeSlot[] = [];
     uniResources.forEach(resource => {
       DEFAULT_TIME_SLOTS.forEach(timeSlot => {
-        [1, 2, 3, 4, 5].forEach(day => {
-          const isOccupied = Math.random() < 0.3; // 30% occupied
+        [1, 2, 3, 4, 5].forEach(day => { // Monday to Friday
           uniSlots.push({
-            id: `uni_slot_${resource.id}_${timeSlot.id}_${day}`,
+            id: `${resource.id}_${timeSlot.id}_${day}`,
             resourceId: resource.id,
             timeSlotId: timeSlot.id,
             dayOfWeek: day,
-            isOccupied,
-            occupiedBy: isOccupied ? {
-              courseId: `course_${Math.floor(Math.random() * 100)}`,
-              courseName: ['Physics Lab', 'Chemistry Practical', 'Department Meeting', 'Guest Lecture', 'Workshop'][Math.floor(Math.random() * 5)],
-              department: ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science'][Math.floor(Math.random() * 5)],
-              faculty: ['Dr. Smith', 'Prof. Johnson', 'Dr. Williams', 'Prof. Brown'][Math.floor(Math.random() * 4)],
-              classSize: Math.floor(Math.random() * 50) + 20,
-            } : undefined,
-            bookingDate: new Date().toISOString(),
+            isAvailable: true,
           });
         });
       });
     });
-    
-    setDepartmentSlots(deptSlots);
     setUniversitySlots(uniSlots);
   };
 
-  const getSlotForResource = (slots: WeeklyTimeSlot[], resourceId: string, timeSlotId: string, day: number) => {
-    return slots.find(slot => 
-      slot.resourceId === resourceId && 
-      slot.timeSlotId === timeSlotId && 
-      slot.dayOfWeek === day
-    );
-  };
+  // Generate sample class sessions
+  const generateSampleSessions = (resources: Resource[], courses: Course[]) => {
+    if (resources.length === 0 || courses.length === 0) return;
 
-  const getSessionForSlot = (resourceId: string, timeSlotId: string, day: number) => {
-    return classSessions.find(session =>
-      session.resourceId === resourceId &&
-      session.timeSlotId === timeSlotId &&
-      session.dayOfWeek === day
-    );
-  };
-
-  const handleBookingRequest = () => {
-    if (!selectedResourceForBooking || !currentHOD) return;
-
-    const newRequest: BookingRequest = {
-      id: `request_${Date.now()}`,
-      requesterId: currentHOD.id,
-      requesterDepartment: currentHOD.department,
-      targetResourceId: selectedResourceForBooking.id,
-      targetDepartment: selectedResourceForBooking.department,
-      timeSlotId: bookingForm.timeSlotId,
-      dayOfWeek: selectedDay,
-      courseName: bookingForm.courseName,
-      purpose: bookingForm.purpose,
-      expectedAttendance: parseInt(bookingForm.expectedAttendance),
-      requestDate: new Date().toISOString(),
-      status: 'pending',
-    };
-
-    setBookingRequests(prev => [...prev, newRequest]);
-    setBookingDialogOpen(false);
-    setSelectedResourceForBooking(null);
-    setBookingForm({
-      timeSlotId: '',
-      courseName: '',
-      purpose: '',
-      expectedAttendance: '',
-    });
-  };
-
-  const handleAllocateSlot = () => {
-    if (!selectedSlotForAllocation || !allocationForm.courseId) return;
-
-    const newSession: ClassSession = {
-      id: `session_${Date.now()}`,
-      courseId: allocationForm.courseId,
-      resourceId: selectedSlotForAllocation.resourceId,
-      timeSlotId: selectedSlotForAllocation.timeSlotId,
-      dayOfWeek: selectedSlotForAllocation.dayOfWeek,
-      faculty: allocationForm.faculty,
-      type: allocationForm.type,
-    };
-
-    setClassSessions(prev => [...prev, newSession]);
+    const sessions: ClassSession[] = [];
+    const classrooms = resources.filter(r => r.type === 'classroom' || r.type === 'lab');
     
-    // Update department slot to mark as occupied
-    setDepartmentSlots(prev => prev.map(slot => {
-      if (slot.resourceId === selectedSlotForAllocation.resourceId &&
-          slot.timeSlotId === selectedSlotForAllocation.timeSlotId &&
-          slot.dayOfWeek === selectedSlotForAllocation.dayOfWeek) {
-        const course = courses.find(c => c.id === allocationForm.courseId);
-        return {
-          ...slot,
-          isOccupied: true,
-          occupiedBy: {
-            courseId: allocationForm.courseId,
-            courseName: course?.name || '',
-            department: currentHOD?.department || '',
-            faculty: allocationForm.faculty,
-            classSize: course?.expectedSize || 0,
-          }
-        };
-      }
-      return slot;
-    }));
+    if (classrooms.length === 0) return;
 
-    setAllocationDialogOpen(false);
-    setSelectedSlotForAllocation(null);
+    // Assign each course to some time slots
+    courses.forEach((course, index) => {
+      const classroom = classrooms[index % classrooms.length];
+      
+      // Theory classes - 2 sessions per week
+      if (course.type === 'theory') {
+        // Monday morning
+        sessions.push({
+          id: `session_${course.id}_1`,
+          courseId: course.id,
+          resourceId: classroom.id,
+          dayOfWeek: 1, // Monday
+          timeSlotId: DEFAULT_TIME_SLOTS[1].id, // 10:00 - 11:00
+          faculty: course.faculty,
+          type: 'theory',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        
+        // Wednesday afternoon
+        sessions.push({
+          id: `session_${course.id}_2`,
+          courseId: course.id,
+          resourceId: classroom.id,
+          dayOfWeek: 3, // Wednesday
+          timeSlotId: DEFAULT_TIME_SLOTS[3].id, // 12:00 - 13:00
+          faculty: course.faculty,
+          type: 'theory',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      
+      // Practical classes - 1 session per week
+      if (course.type === 'practical') {
+        const labRoom = resources.find(r => r.type === 'lab') || classroom;
+        
+        // Friday afternoon
+        sessions.push({
+          id: `session_${course.id}_1`,
+          courseId: course.id,
+          resourceId: labRoom.id,
+          dayOfWeek: 5, // Friday
+          timeSlotId: DEFAULT_TIME_SLOTS[4].id, // 13:00 - 14:00
+          faculty: course.faculty,
+          type: 'practical',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    setClassSessions(sessions);
+  };
+
+  // Generate sample booking requests
+  const generateSampleBookingRequests = () => {
+    const requests: BookingRequest[] = [
+      {
+        id: 'req_1',
+        resourceId: SAMPLE_SHARED_RESOURCES[0].id, // Main Auditorium
+        requestedBy: currentHOD?.id || 'unknown',
+        department: currentHOD?.department || 'Unknown',
+        purpose: 'Department Annual Day Celebration',
+        date: '2024-06-15',
+        startTime: '14:00',
+        endTime: '18:00',
+        attendees: 300,
+        status: 'pending',
+        notes: 'Need full audio-visual setup and stage arrangements',
+        createdAt: '2024-05-20T10:30:00Z',
+        updatedAt: '2024-05-20T10:30:00Z',
+      },
+      {
+        id: 'req_2',
+        resourceId: SAMPLE_SHARED_RESOURCES[1].id, // Conference Hall
+        requestedBy: currentHOD?.id || 'unknown',
+        department: currentHOD?.department || 'Unknown',
+        purpose: 'Faculty Meeting',
+        date: '2024-06-10',
+        startTime: '10:00',
+        endTime: '12:00',
+        attendees: 25,
+        status: 'approved',
+        notes: 'Need projector and video conferencing setup',
+        createdAt: '2024-05-15T09:15:00Z',
+        updatedAt: '2024-05-16T14:20:00Z',
+        approvedBy: 'admin',
+        approvedAt: '2024-05-16T14:20:00Z',
+      },
+      {
+        id: 'req_3',
+        resourceId: SAMPLE_SHARED_RESOURCES[2].id, // Computer Lab
+        requestedBy: currentHOD?.id || 'unknown',
+        department: currentHOD?.department || 'Unknown',
+        purpose: 'Special Workshop on Data Analysis',
+        date: '2024-06-20',
+        startTime: '09:00',
+        endTime: '13:00',
+        attendees: 40,
+        status: 'rejected',
+        notes: 'Need computers with statistical software installed',
+        createdAt: '2024-05-18T11:45:00Z',
+        updatedAt: '2024-05-19T10:10:00Z',
+        rejectedBy: 'admin',
+        rejectedAt: '2024-05-19T10:10:00Z',
+        rejectionReason: 'Lab already booked for university-wide examination',
+      },
+    ];
+    
+    setBookingRequests(requests);
+  };
+
+  // Handle booking form submission
+  const handleBookingSubmit = () => {
+    // Validation
+    if (!bookingForm.resourceId || !bookingForm.purpose || !bookingForm.date || 
+        !bookingForm.startTime || !bookingForm.endTime) {
+      setError('Please fill all required fields');
+      return;
+    }
+    
+    // Create new booking request
+    const newRequest: BookingRequest = {
+      id: `req_${Date.now()}`,
+      resourceId: bookingForm.resourceId,
+      requestedBy: currentHOD?.id || 'unknown',
+      department: currentHOD?.department || 'Unknown',
+      purpose: bookingForm.purpose,
+      date: bookingForm.date,
+      startTime: bookingForm.startTime,
+      endTime: bookingForm.endTime,
+      attendees: parseInt(bookingForm.attendees) || 0,
+      status: 'pending',
+      notes: bookingForm.notes,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    // Add to state
+    setBookingRequests([...bookingRequests, newRequest]);
+    
+    // Reset form and close dialog
+    setBookingForm({
+      resourceId: '',
+      purpose: '',
+      date: '',
+      startTime: '',
+      endTime: '',
+      attendees: '',
+      notes: '',
+    });
+    setBookingDialogOpen(false);
+  };
+
+  // Open allocation dialog
+  const openAllocationDialog = (resourceId: string, timeSlotId: string, dayOfWeek: number) => {
+    setSelectedSlot({ resourceId, timeSlotId, dayOfWeek });
     setAllocationForm({
       courseId: '',
       faculty: '',
       type: 'theory',
     });
     setConflicts([]);
-  };
-
-  const handleRemoveAllocation = (session: ClassSession) => {
-    setClassSessions(prev => prev.filter(s => s.id !== session.id));
-    
-    // Update department slot to mark as vacant
-    setDepartmentSlots(prev => prev.map(slot => {
-      if (slot.resourceId === session.resourceId &&
-          slot.timeSlotId === session.timeSlotId &&
-          slot.dayOfWeek === session.dayOfWeek) {
-        return {
-          ...slot,
-          isOccupied: false,
-          occupiedBy: undefined,
-        };
-      }
-      return slot;
-    }));
-  };
-
-  const openBookingDialog = (resource: Resource, timeSlotId: string) => {
-    setSelectedResourceForBooking(resource);
-    setBookingForm(prev => ({ ...prev, timeSlotId }));
-    setBookingDialogOpen(true);
-  };
-
-  const openAllocationDialog = (resourceId: string, timeSlotId: string, dayOfWeek: number) => {
-    setSelectedSlotForAllocation({ resourceId, timeSlotId, dayOfWeek });
     setAllocationDialogOpen(true);
-    setConflicts([]);
   };
 
-  const getStatusColor = (isOccupied: boolean) => {
-    return isOccupied ? 'bg-red-100 text-red-700 border-red-200' : 'bg-green-100 text-green-700 border-green-200';
+  // Handle allocation form submission
+  const handleAllocateSlot = () => {
+    if (!selectedSlot || !allocationForm.courseId || !allocationForm.faculty) {
+      setError('Please fill all required fields');
+      return;
+    }
+    
+    // Check for conflicts
+    const conflictChecks: string[] = [];
+    
+    // Check if resource is already allocated at this time
+    const resourceConflict = classSessions.find(
+      s => s.resourceId === selectedSlot.resourceId && 
+           s.dayOfWeek === selectedSlot.dayOfWeek && 
+           s.timeSlotId === selectedSlot.timeSlotId
+    );
+    
+    if (resourceConflict) {
+      const course = courses.find(c => c.id === resourceConflict.courseId);
+      conflictChecks.push(`Resource already allocated to ${course?.name || 'another course'} at this time`);
+    }
+    
+    // Check if faculty is already teaching at this time
+    const facultyConflict = classSessions.find(
+      s => s.faculty === allocationForm.faculty && 
+           s.dayOfWeek === selectedSlot.dayOfWeek && 
+           s.timeSlotId === selectedSlot.timeSlotId
+    );
+    
+    if (facultyConflict) {
+      const course = courses.find(c => c.id === facultyConflict.courseId);
+      conflictChecks.push(`Faculty already teaching ${course?.name || 'another course'} at this time`);
+    }
+    
+    // If conflicts found, show them
+    if (conflictChecks.length > 0) {
+      setConflicts(conflictChecks);
+      return;
+    }
+    
+    // Create new session
+    const newSession: ClassSession = {
+      id: `session_${Date.now()}`,
+      courseId: allocationForm.courseId,
+      resourceId: selectedSlot.resourceId,
+      dayOfWeek: selectedSlot.dayOfWeek,
+      timeSlotId: selectedSlot.timeSlotId,
+      faculty: allocationForm.faculty,
+      type: allocationForm.type,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    // Add to state
+    setClassSessions([...classSessions, newSession]);
+    
+    // Close dialog
+    setAllocationDialogOpen(false);
   };
 
-  const getResourceTypeIcon = (type: Resource['type']) => {
-    switch (type) {
-      case 'seminar_hall':
-        return <Building2 className="h-4 w-4" />;
-      case 'conference_room':
-        return <Users className="h-4 w-4" />;
-      case 'lab':
-        return <Building2 className="h-4 w-4" />;
-      default:
-        return <Building2 className="h-4 w-4" />;
+  // Handle removing an allocation
+  const handleRemoveAllocation = (session: ClassSession) => {
+    setClassSessions(classSessions.filter(s => s.id !== session.id));
+  };
+
+  // Get resource availability for a specific day and time slot
+  const getResourceAvailability = (resourceId: string, timeSlotId: string, day: number) => {
+    const session = classSessions.find(
+      s => s.resourceId === resourceId && s.timeSlotId === timeSlotId && s.dayOfWeek === day
+    );
+    
+    if (session) {
+      const course = courses.find(c => c.id === session.courseId);
+      return {
+        isOccupied: true,
+        occupiedBy: {
+          courseId: session.courseId,
+          courseName: course?.name || 'Unknown Course',
+          faculty: session.faculty,
+          type: session.type,
+          classSize: course?.expectedSize || 0,
+        }
+      };
+    }
+
+    return {
+      isOccupied: false,
+      occupiedBy: undefined,
+    };
+  };
+
+  // Auto-generate routine
+  const autoGenerateRoutine = async () => {
+    try {
+      setLoading(true);
+      
+      // Clear existing sessions
+      setClassSessions([]);
+      
+      // Wait for 1 second to simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate new sessions
+      const newSessions: ClassSession[] = [];
+      const classrooms = departmentResources.filter(r => r.type === 'classroom' || r.type === 'lab');
+      
+      if (classrooms.length === 0 || courses.length === 0) {
+        setError('Not enough resources or courses to generate routine');
+        setLoading(false);
+        return;
+      }
+      
+      // Assign each course to time slots
+      courses.forEach((course, index) => {
+        const classroom = classrooms[index % classrooms.length];
+        const sessionsNeeded = course.type === 'theory' ? 3 : 1; // Theory: 3 sessions, Practical: 1 session
+        
+        // Find available slots
+        const availableSlots: {day: number, timeSlot: typeof DEFAULT_TIME_SLOTS[0]}[] = [];
+        
+        // Check all days and time slots
+        [1, 2, 3, 4, 5].forEach(day => { // Monday to Friday
+          DEFAULT_TIME_SLOTS.forEach(timeSlot => {
+            // Check if slot is available
+            const isSlotAvailable = !newSessions.some(
+              s => (s.resourceId === classroom.id && s.dayOfWeek === day && s.timeSlotId === timeSlot.id) || 
+                   (s.faculty === course.faculty && s.dayOfWeek === day && s.timeSlotId === timeSlot.id)
+            );
+            
+            if (isSlotAvailable) {
+              availableSlots.push({ day, timeSlot });
+            }
+          });
+        });
+        
+        // Shuffle available slots to randomize allocation
+        const shuffledSlots = [...availableSlots].sort(() => 0.5 - Math.random());
+        
+        // Allocate sessions
+        for (let i = 0; i < Math.min(sessionsNeeded, shuffledSlots.length); i++) {
+          const slot = shuffledSlots[i];
+          
+          newSessions.push({
+            id: `session_${course.id}_${i}`,
+            courseId: course.id,
+            resourceId: classroom.id,
+            dayOfWeek: slot.day,
+            timeSlotId: slot.timeSlot.id,
+            faculty: course.faculty,
+            type: course.type,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      });
+      
+      setClassSessions(newSessions);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error auto-generating routine:', error);
+      setError('Failed to generate routine. Please try again.');
+      setLoading(false);
     }
   };
 
-  const autoGenerateRoutine = () => {
-    // Clear existing sessions
-    setClassSessions([]);
-    setDepartmentSlots(prev => prev.map(slot => ({
-      ...slot,
-      isOccupied: false,
-      occupiedBy: undefined,
-    })));
-
-    const newSessions: ClassSession[] = [];
-    const usedSlots = new Set<string>();
-
-    courses.forEach(course => {
-      const sessionsNeeded = course.weeklyHours;
-      let sessionsScheduled = 0;
-
-      // Try to schedule sessions for this course
-      for (let day = 1; day <= 5 && sessionsScheduled < sessionsNeeded; day++) {
-        for (let timeSlotIndex = 0; timeSlotIndex < DEFAULT_TIME_SLOTS.length && sessionsScheduled < sessionsNeeded; timeSlotIndex++) {
-          const timeSlot = DEFAULT_TIME_SLOTS[timeSlotIndex];
-          
-          // Find suitable resource
-          const suitableResource = departmentResources.find(resource => {
-            const slotKey = `${resource.id}_${timeSlot.id}_${day}`;
-            const isResourceFree = !usedSlots.has(slotKey);
-            const hasCapacity = resource.capacity >= course.expectedSize;
-            const isRightType = (course.type === 'practical' && resource.type === 'lab') ||
-                              (course.type === 'theory' && (resource.type === 'classroom' || resource.type === 'seminar_hall'));
-            
-            return isResourceFree && hasCapacity && isRightType;
-          });
-
-          if (suitableResource) {
-            const session: ClassSession = {
-              id: `auto_session_${Date.now()}_${sessionsScheduled}`,
-              courseId: course.id,
-              resourceId: suitableResource.id,
-              timeSlotId: timeSlot.id,
-              dayOfWeek: day,
-              faculty: course.faculty,
-              type: course.type,
-            };
-
-            newSessions.push(session);
-            usedSlots.add(`${suitableResource.id}_${timeSlot.id}_${day}`);
-            sessionsScheduled++;
-          }
-        }
-      }
-    });
-
-    setClassSessions(newSessions);
-
-    // Update department slots
-    setDepartmentSlots(prev => prev.map(slot => {
-      const session = newSessions.find(s =>
-        s.resourceId === slot.resourceId &&
-        s.timeSlotId === slot.timeSlotId &&
-        s.dayOfWeek === slot.dayOfWeek
-      );
-
-      if (session) {
-        const course = courses.find(c => c.id === session.courseId);
-        return {
-          ...slot,
-          isOccupied: true,
-          occupiedBy: {
-            courseId: session.courseId,
-            courseName: course?.name || '',
-            department: currentHOD?.department || '',
-            faculty: session.faculty,
-            classSize: course?.expectedSize || 0,
-          }
-        };
-      }
-
+  // Transform weekly slots with session data
+  const getTransformedSlots = (slots: WeeklyTimeSlot[], day: number) => {
+    return slots.filter(slot => slot.dayOfWeek === day).map(slot => {
+      const availability = getResourceAvailability(slot.resourceId, slot.timeSlotId, day);
       return {
         ...slot,
-        isOccupied: false,
-        occupiedBy: undefined,
+        isOccupied: availability.isOccupied,
+        occupiedBy: availability.occupiedBy,
       };
-    }));
+    });
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Resource Management</h1>
-          <p className="text-slate-600 mt-1">Manage department and university resources</p>
+      {loading && (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
         </div>
-        <div className="flex items-center space-x-3">
-          <Button
-            onClick={autoGenerateRoutine}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
-            <Wand2 className="h-4 w-4 mr-2" />
-            Auto-Generate Routine
-          </Button>
-          <Select value={selectedDay.toString()} onValueChange={(value) => setSelectedDay(parseInt(value))}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DAYS.slice(1, 6).map((day, index) => (
-                <SelectItem key={index + 1} value={(index + 1).toString()}>
-                  {day}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      )}
 
-      {/* Resources Tabs */}
-      <Tabs defaultValue="department" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 bg-white/80 backdrop-blur-sm">
-          <TabsTrigger
-            value="department"
-            className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-          >
-            <Building2 className="h-4 w-4 mr-2" />
-            Department Resources
-          </TabsTrigger>
-          <TabsTrigger
-            value="university"
-            className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-          >
-            <Globe className="h-4 w-4 mr-2" />
-            University Resources
-          </TabsTrigger>
-        </TabsList>
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-        {/* Department Resources Tab */}
-        <TabsContent value="department" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Building2 className="h-5 w-5 mr-2" />
-                {currentHOD?.department} Resources - {DAYS[selectedDay]} Schedule
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {departmentResources.map(resource => (
-                  <div key={resource.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        {getResourceTypeIcon(resource.type)}
-                        <div>
-                          <h3 className="font-semibold">{resource.name}</h3>
-                          <p className="text-sm text-slate-600">
-                            Capacity: {resource.capacity} • {resource.type.replace('_', ' ')}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant="outline">
-                        {resource.location}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-6 gap-2">
-                      {DEFAULT_TIME_SLOTS.map(timeSlot => {
-                        const slot = getSlotForResource(departmentSlots, resource.id, timeSlot.id, selectedDay);
-                        const session = getSessionForSlot(resource.id, timeSlot.id, selectedDay);
-
-                        return (
-                          <div
-                            key={timeSlot.id}
-                            className={`p-3 rounded-lg border text-center cursor-pointer transition-all ${
-                              slot?.isOccupied 
-                                ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200' 
-                                : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                            }`}
-                            onClick={() => {
-                              if (slot?.isOccupied && session) {
-                                if (confirm('Remove this class allocation?')) {
-                                  handleRemoveAllocation(session);
-                                }
-                              } else {
-                                openAllocationDialog(resource.id, timeSlot.id, selectedDay);
-                              }
-                            }}
-                          >
-                            <div className="font-medium text-xs">{timeSlot.label}</div>
-                            {slot?.isOccupied && slot.occupiedBy ? (
-                              <div className="mt-2 space-y-1">
-                                <div className="text-xs font-medium">{slot.occupiedBy.courseName}</div>
-                                <div className="text-xs">{slot.occupiedBy.faculty}</div>
-                                <div className="text-xs">
-                                  Occupied by {currentHOD?.department}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="mt-2 text-xs">
-                                <Plus className="h-3 w-3 mx-auto mb-1" />
-                                Available
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* University Resources Tab */}
-        <TabsContent value="university" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-            {universityResources.map((resource) => (
-              <Card 
-                key={resource.id} 
-                className="cursor-pointer transition-all hover:shadow-lg"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {getResourceTypeIcon(resource.type)}
-                      <CardTitle className="text-lg">{resource.name}</CardTitle>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {resource.type.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center text-sm text-slate-600">
-                    <Users className="h-4 w-4 mr-2" />
-                    Capacity: {resource.capacity}
-                  </div>
-                  
-                  {resource.location && (
-                    <div className="flex items-center text-sm text-slate-600">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      {resource.location}
-                    </div>
-                  )}
-
-                  {resource.facilities && resource.facilities.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium text-slate-700 mb-1">Facilities:</div>
-                      <div className="flex flex-wrap gap-1">
-                        {resource.facilities.slice(0, 3).map((facility, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {facility}
-                          </Badge>
-                        ))}
-                        {resource.facilities.length > 3 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{resource.facilities.length - 3} more
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+      {!loading && !error && (
+      <div>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Resource Management</h1>
+            <p className="text-slate-600 mt-1">Manage department and university resources</p>
           </div>
+          <div className="flex items-center space-x-3">
+            <Button
+              onClick={autoGenerateRoutine}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              Auto-Generate Routine
+            </Button>
+            <Select value={selectedDay.toString()} onValueChange={(value) => setSelectedDay(parseInt(value))}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DAYS.slice(1, 6).map((day, index) => (
+                  <SelectItem key={index + 1} value={(index + 1).toString()}>
+                    {day}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
-                University Resources - {DAYS[selectedDay]} Schedule
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {universityResources.map(resource => (
-                  <div key={resource.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        {getResourceTypeIcon(resource.type)}
-                        <div>
-                          <h3 className="font-semibold">{resource.name}</h3>
-                          <p className="text-sm text-slate-600">
-                            Capacity: {resource.capacity} • {resource.type.replace('_', ' ')}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant="outline">
-                        Shared Resource
-                      </Badge>
+        {/* Resources Tabs */}
+        <Tabs defaultValue="department" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 bg-white/80 backdrop-blur-sm">
+            <TabsTrigger
+              value="department"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              Department Resources
+            </TabsTrigger>
+            <TabsTrigger
+              value="university"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Globe className="h-4 w-4 mr-2" />
+              University Resources
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Department Resources Tab */}
+          <TabsContent value="department" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Building2 className="h-5 w-5 mr-2" />
+                  {currentHOD?.department} Resources - {DAYS[selectedDay]} Schedule
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-6">
+                  {departmentResources.map(resource => {
+                    const timeSlots = DEFAULT_TIME_SLOTS;
+                    const resourceSlots = getTransformedSlots(
+                      departmentSlots.filter(s => s.resourceId === resource.id),
+                      selectedDay
+                    );
+
+                    return (
+                      <Card key={resource.id} className="overflow-hidden">
+                        <CardHeader className="bg-slate-50 py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Badge variant="outline" className="mr-2 capitalize">
+                                {resource.type.replace('_', ' ')}
+                              </Badge>
+                              <CardTitle className="text-lg">{resource.name}</CardTitle>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
+                                <Users className="h-3 w-3 mr-1" />
+                                {resource.capacity}
+                              </Badge>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-1 p-2">
+                            {timeSlots.map(timeSlot => {
+                              const slot = resourceSlots.find(s => s.timeSlotId === timeSlot.id);
+                              const course = slot?.occupiedBy ? courses.find(c => c.id === slot.occupiedBy?.courseId) : null;
+                              const session = classSessions.find(
+                                s => s.resourceId === resource.id && s.timeSlotId === timeSlot.id && s.dayOfWeek === selectedDay
+                              );
+
+                              return (
+                                <div
+                                  key={`${resource.id}_${timeSlot.id}`}
+                                  className={`p-2 rounded-md border cursor-pointer transition-colors ${
+                                    slot?.isOccupied 
+                                      ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200' 
+                                      : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                                  }`}
+                                  onClick={() => {
+                                    if (slot?.isOccupied && session) {
+                                      // Show option to remove
+                                      if (confirm('Remove this class allocation?')) {
+                                        handleRemoveAllocation(session);
+                                      }
+                                    } else {
+                                      openAllocationDialog(resource.id, timeSlot.id, selectedDay);
+                                    }
+                                  }}
+                                >
+                                  <div className="font-medium text-xs">{timeSlot.label}</div>
+                                  {slot?.isOccupied && course ? (
+                                    <div className="mt-2 space-y-1">
+                                      <div className="text-xs font-medium">{course.name}</div>
+                                      <div className="text-xs">{slot.occupiedBy?.faculty}</div>
+                                      <div className="text-xs">
+                                        {slot.occupiedBy?.type} • {slot.occupiedBy?.classSize} students
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="mt-2 text-xs">
+                                      <Plus className="h-3 w-3 mx-auto mb-1" />
+                                      Allocate
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* University Resources Tab */}
+          <TabsContent value="university" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Globe className="h-5 w-5 mr-2" />
+                  University Resources - {DAYS[selectedDay]} Schedule
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-6">
+                  {universityResources.map(resource => {
+                    const timeSlots = DEFAULT_TIME_SLOTS;
+                    
+                    return (
+                      <Card key={resource.id} className="overflow-hidden">
+                        <CardHeader className="bg-slate-50 py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Badge variant="outline" className="mr-2 capitalize">
+                                {resource.type.replace('_', ' ')}
+                              </Badge>
+                              <CardTitle className="text-lg">{resource.name}</CardTitle>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
+                                <Users className="h-3 w-3 mr-1" />
+                                {resource.capacity}
+                              </Badge>
+                              <Button variant="outline" size="sm" onClick={() => {
+                                setBookingForm({
+                                  ...bookingForm,
+                                  resourceId: resource.id,
+                                });
+                                setBookingDialogOpen(true);
+                              }}>
+                                <Send className="h-3 w-3 mr-1" />
+                                Request
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-1 p-2">
+                            {timeSlots.map(timeSlot => {
+                              // Check if there's a booking for this resource on the selected day
+                              const hasBooking = bookingRequests.some(
+                                req => req.resourceId === resource.id && 
+                                      req.status === 'approved' && 
+                                      req.date === `2024-06-${selectedDay + 10}` && // Just for demo
+                                      req.startTime <= timeSlot.start && 
+                                      req.endTime >= timeSlot.end
+                              );
+                              
+                              const booking = hasBooking 
+                                ? bookingRequests.find(
+                                    req => req.resourceId === resource.id && 
+                                          req.status === 'approved' && 
+                                          req.date === `2024-06-${selectedDay + 10}` && 
+                                          req.startTime <= timeSlot.start && 
+                                          req.endTime >= timeSlot.end
+                                  )
+                                : null;
+
+                              return (
+                                <div
+                                  key={`${resource.id}_${timeSlot.id}`}
+                                  className={`p-2 rounded-md border ${
+                                    hasBooking 
+                                      ? 'bg-amber-100 text-amber-700 border-amber-200' 
+                                      : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-pointer'
+                                  }`}
+                                  onClick={() => {
+                                    if (!hasBooking) {
+                                      setBookingForm({
+                                        ...bookingForm,
+                                        resourceId: resource.id,
+                                        date: `2024-06-${selectedDay + 10}`,
+                                        startTime: timeSlot.start,
+                                        endTime: timeSlot.end,
+                                      });
+                                      setBookingDialogOpen(true);
+                                    }
+                                  }}
+                                >
+                                  <div className="font-medium text-xs">{timeSlot.label}</div>
+                                  {hasBooking && booking ? (
+                                    <div className="mt-2 space-y-1">
+                                      <div className="text-xs font-medium">{booking.purpose}</div>
+                                      <div className="text-xs">{booking.department}</div>
+                                      <div className="text-xs">
+                                        <Users className="h-3 w-3 inline mr-1" />
+                                        {booking.attendees}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="mt-2 text-xs">
+                                      <Plus className="h-3 w-3 mx-auto mb-1" />
+                                      Book
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Booking Requests */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Send className="h-5 w-5 mr-2" />
+                  My Booking Requests
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {bookingRequests.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500">
+                      No booking requests found
                     </div>
-
-                    <div className="grid grid-cols-6 gap-2">
-                      {DEFAULT_TIME_SLOTS.map(timeSlot => {
-                        const slot = getSlotForResource(universitySlots, resource.id, timeSlot.id, selectedDay);
-
-                        return (
-                          <div
-                            key={timeSlot.id}
-                            className={`p-3 rounded-lg border text-center cursor-pointer transition-all ${getStatusColor(slot?.isOccupied || false)}`}
-                            onClick={() => {
-                              if (!slot?.isOccupied) {
-                                openBookingDialog(resource, timeSlot.id);
-                              }
-                            }}
-                          >
-                            <div className="font-medium text-xs">{timeSlot.label}</div>
-                            {slot?.isOccupied && slot.occupiedBy ? (
-                              <div className="mt-2 space-y-1">
-                                <div className="text-xs font-medium">{slot.occupiedBy.courseName}</div>
-                                <div className="text-xs">{slot.occupiedBy.faculty}</div>
-                                <div className="text-xs">
-                                  Booked by {slot.occupiedBy.department}
+                  ) : (
+                    bookingRequests.map(request => {
+                      const resource = universityResources.find(r => r.id === request.resourceId);
+                      
+                      return (
+                        <Card key={request.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="font-medium">{request.purpose}</h3>
+                                <p className="text-sm text-slate-600">{resource?.name}</p>
+                                <div className="flex items-center mt-2 text-sm text-slate-600">
+                                  <Calendar className="h-4 w-4 mr-1" />
+                                  {request.date}
+                                  <Clock className="h-4 w-4 ml-3 mr-1" />
+                                  {request.startTime} - {request.endTime}
+                                  <Users className="h-4 w-4 ml-3 mr-1" />
+                                  {request.attendees} attendees
                                 </div>
                               </div>
-                            ) : (
-                              <div className="mt-2 text-xs">
-                                <Send className="h-3 w-3 mx-auto mb-1" />
-                                Request
+                              <Badge className={
+                                request.status === 'approved' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
+                                request.status === 'rejected' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
+                                'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                              }>
+                                {request.status === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                {request.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                                {request.status === 'pending' && <AlertCircle className="h-3 w-3 mr-1" />}
+                                {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                              </Badge>
+                            </div>
+                            
+                            {request.status === 'rejected' && request.rejectionReason && (
+                              <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">
+                                <strong>Reason:</strong> {request.rejectionReason}
                               </div>
                             )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                            
+                            {request.notes && (
+                              <div className="mt-3 text-sm text-slate-600">
+                                <strong>Notes:</strong> {request.notes}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+      )}
 
-      {/* Booking Request Dialog */}
+      {/* Resource Booking Dialog */}
       <Dialog open={bookingDialogOpen} onOpenChange={setBookingDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Resource Booking</DialogTitle>
+            <DialogTitle>Book University Resource</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            {selectedResourceForBooking && (
-              <>
-                <div>
-                  <Label>Resource</Label>
-                  <Input value={selectedResourceForBooking.name} disabled />
-                </div>
-                
-                <div>
-                  <Label>Day</Label>
-                  <Input value={DAYS[selectedDay]} disabled />
-                </div>
-                
-                <div>
-                  <Label>Time Slot</Label>
-                  <Input value={DEFAULT_TIME_SLOTS.find(t => t.id === bookingForm.timeSlotId)?.label || ''} disabled />
-                </div>
-              </>
-            )}
-            
-            <div>
-              <Label htmlFor="courseName">Course/Event Name *</Label>
-              <Input
-                id="courseName"
-                value={bookingForm.courseName}
-                onChange={(e) => setBookingForm(prev => ({ ...prev, courseName: e.target.value }))}
-                placeholder="Enter course or event name"
-              />
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="resource">Resource</Label>
+              <Select 
+                value={bookingForm.resourceId} 
+                onValueChange={(value) => setBookingForm({...bookingForm, resourceId: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a resource" />
+                </SelectTrigger>
+                <SelectContent>
+                  {universityResources.map(resource => (
+                    <SelectItem key={resource.id} value={resource.id}>
+                      {resource.name} ({resource.capacity} capacity)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            
-            <div>
-              <Label htmlFor="expectedAttendance">Expected Attendance *</Label>
-              <Input
-                id="expectedAttendance"
-                type="number"
-                value={bookingForm.expectedAttendance}
-                onChange={(e) => setBookingForm(prev => ({ ...prev, expectedAttendance: e.target.value }))}
-                placeholder="Number of attendees"
-                max={selectedResourceForBooking?.capacity}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="purpose">Purpose (Optional)</Label>
-              <Textarea
-                id="purpose"
+
+            <div className="space-y-2">
+              <Label htmlFor="purpose">Purpose</Label>
+              <Input 
+                id="purpose" 
                 value={bookingForm.purpose}
-                onChange={(e) => setBookingForm(prev => ({ ...prev, purpose: e.target.value }))}
-                placeholder="Additional details about the booking"
-                rows={3}
+                onChange={(e) => setBookingForm({...bookingForm, purpose: e.target.value})}
+                placeholder="e.g., Department Meeting, Workshop, etc."
               />
             </div>
-            
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date">Date</Label>
+                <Input 
+                  id="date" 
+                  type="date" 
+                  value={bookingForm.date}
+                  onChange={(e) => setBookingForm({...bookingForm, date: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="startTime">Start Time</Label>
+                <Input 
+                  id="startTime" 
+                  type="time" 
+                  value={bookingForm.startTime}
+                  onChange={(e) => setBookingForm({...bookingForm, startTime: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endTime">End Time</Label>
+                <Input 
+                  id="endTime" 
+                  type="time" 
+                  value={bookingForm.endTime}
+                  onChange={(e) => setBookingForm({...bookingForm, endTime: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="attendees">Expected Attendees</Label>
+              <Input 
+                id="attendees" 
+                type="number" 
+                value={bookingForm.attendees}
+                onChange={(e) => setBookingForm({...bookingForm, attendees: e.target.value})}
+                placeholder="Number of attendees"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Additional Notes</Label>
+              <Textarea 
+                id="notes" 
+                value={bookingForm.notes}
+                onChange={(e) => setBookingForm({...bookingForm, notes: e.target.value})}
+                placeholder="Any special requirements or additional information"
+              />
+            </div>
+
             <div className="flex space-x-3">
               <Button 
-                onClick={handleBookingRequest}
-                disabled={!bookingForm.courseName || !bookingForm.expectedAttendance}
+                onClick={handleBookingSubmit}
+                disabled={!bookingForm.resourceId || !bookingForm.purpose || !bookingForm.date || !bookingForm.startTime || !bookingForm.endTime}
                 className="flex-1"
               >
-                Send Request
+                <Send className="h-4 w-4 mr-2" />
+                Submit Request
               </Button>
               <Button 
                 variant="outline" 
@@ -899,66 +1247,49 @@ export default function Resources() {
         </DialogContent>
       </Dialog>
 
-      {/* Allocation Dialog */}
+      {/* Class Allocation Dialog */}
       <Dialog open={allocationDialogOpen} onOpenChange={setAllocationDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Allocate Time Slot</DialogTitle>
+            <DialogTitle>Allocate Class Session</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            {selectedSlotForAllocation && (
-              <>
-                <div>
-                  <Label>Resource</Label>
-                  <Input 
-                    value={departmentResources.find(r => r.id === selectedSlotForAllocation.resourceId)?.name || ''} 
-                    disabled 
-                  />
-                </div>
-                
-                <div>
-                  <Label>Time Slot</Label>
-                  <Input 
-                    value={`${DAYS[selectedSlotForAllocation.dayOfWeek]} • ${DEFAULT_TIME_SLOTS.find(t => t.id === selectedSlotForAllocation.timeSlotId)?.label}`} 
-                    disabled 
-                  />
-                </div>
-              </>
-            )}
-            
-            <div>
-              <Label htmlFor="course">Course *</Label>
-              <Select value={allocationForm.courseId} onValueChange={(value) => 
-                setAllocationForm(prev => ({ ...prev, courseId: value }))
-              }>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="course">Course</Label>
+              <Select 
+                value={allocationForm.courseId} 
+                onValueChange={(value) => setAllocationForm({...allocationForm, courseId: value})}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select course" />
+                  <SelectValue placeholder="Select a course" />
                 </SelectTrigger>
                 <SelectContent>
                   {courses.map(course => (
                     <SelectItem key={course.id} value={course.id}>
-                      {course.name} ({course.code}) - {course.faculty}
+                      {course.name} ({course.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
-            <div>
-              <Label htmlFor="faculty">Faculty *</Label>
-              <Input
-                id="faculty"
+
+            <div className="space-y-2">
+              <Label htmlFor="faculty">Faculty</Label>
+              <Input 
+                id="faculty" 
                 value={allocationForm.faculty}
-                onChange={(e) => setAllocationForm(prev => ({ ...prev, faculty: e.target.value }))}
-                placeholder="Enter faculty name"
+                onChange={(e) => setAllocationForm({...allocationForm, faculty: e.target.value})}
+                placeholder="Faculty name"
               />
             </div>
-            
-            <div>
-              <Label htmlFor="type">Class Type *</Label>
-              <Select value={allocationForm.type} onValueChange={(value: any) => 
-                setAllocationForm(prev => ({ ...prev, type: value }))
-              }>
+
+            <div className="space-y-2">
+              <Label htmlFor="type">Class Type</Label>
+              <Select 
+                value={allocationForm.type} 
+                onValueChange={(value: 'theory' | 'practical' | 'tutorial' | 'seminar') => 
+                  setAllocationForm({...allocationForm, type: value})}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -975,7 +1306,7 @@ export default function Resources() {
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  <div className="space-y-1">
+                  <div className="space-y-1 mt-2">
                     {conflicts.map((conflict, index) => (
                       <div key={index}>{conflict}</div>
                     ))}

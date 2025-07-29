@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useHODAuth } from '@/hooks/use-hod-auth';
-import { Resource, WeeklyTimeSlot, BookingRequest, DEFAULT_TIME_SLOTS } from '@shared/resource-types';
+import { Resource, WeeklyTimeSlot, BookingRequest, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
 import { 
   Building2, 
   Calendar, 
