@@ -197,32 +197,32 @@ export default function HODDashboard() {
 
   const quickActions = [
     {
-      title: "University Resources",
-      icon: Globe,
-      action: () => setActiveTab("university-resources"),
-      color: "bg-blue-500 hover:bg-blue-600",
-      description: "Browse shared facilities",
-    },
-    {
-      title: "Department Resources",
+      title: "Resources",
       icon: Building2,
-      action: () => setActiveTab("department-resources"),
-      color: "bg-green-500 hover:bg-green-600",
-      description: "Manage your resources",
+      action: () => setActiveTab("resources"),
+      color: "bg-blue-500 hover:bg-blue-600",
+      description: "Manage & book resources",
     },
     {
       title: "Routine Builder",
       icon: Calendar,
       action: () => setActiveTab("routine-builder"),
-      color: "bg-purple-500 hover:bg-purple-600",
+      color: "bg-green-500 hover:bg-green-600",
       description: "Create class schedules",
     },
     {
       title: "Resource Management",
       icon: Database,
       action: () => setActiveTab("resource-management"),
-      color: "bg-orange-500 hover:bg-orange-600",
+      color: "bg-purple-500 hover:bg-purple-600",
       description: "Add/edit resources",
+    },
+    {
+      title: "Booking Requests",
+      icon: Send,
+      action: () => setActiveTab("booking-requests"),
+      color: "bg-orange-500 hover:bg-orange-600",
+      description: "Manage requests",
     },
   ];
 
