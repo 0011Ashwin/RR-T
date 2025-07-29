@@ -8,7 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHODAuth } from '@/hooks/use-hod-auth';
-import { BookingRequest, Resource, DEFAULT_TIME_SLOTS } from '@shared/resource-types';
+import { BookingRequest, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
+import { UpdateBookingRequestStatusRequest } from '../../shared/api';
+import { BookingRequestService } from '@/services/booking-request-service';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Send,
   CheckCircle,
@@ -27,85 +30,58 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 
 export default function BookingRequests() {
   const { currentHOD, allHODs } = useHODAuth();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('received');
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<BookingRequest | null>(null);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
   const [responseText, setResponseText] = useState('');
   const [responseAction, setResponseAction] = useState<'approve' | 'reject'>('approve');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Sample booking requests
+  // Fetch booking requests from API
   useEffect(() => {
     if (!currentHOD) return;
-
-    const sampleRequests: BookingRequest[] = [
-      // Requests received by current HOD's department
-      {
-        id: 'req_1',
-        requesterId: currentHOD.department === 'Geography' ? 'hod_business' : 'hod_geography',
-        requesterDepartment: currentHOD.department === 'Geography' ? 'Business Management' : 'Geography',
-        targetResourceId: 'geo_1',
-        targetDepartment: currentHOD.department,
-        timeSlotId: '2',
-        dayOfWeek: 2,
-        courseName: 'Business Research Methods',
-        purpose: 'Need access to mapping software for research presentation',
-        expectedAttendance: 25,
-        requestDate: '2024-01-25T10:30:00Z',
-        status: 'pending',
-      },
-      {
-        id: 'req_2',
-        requesterId: currentHOD.department === 'Geography' ? 'hod_business' : 'hod_geography',
-        requesterDepartment: currentHOD.department === 'Geography' ? 'Business Management' : 'Geography',
-        targetResourceId: 'geo_2',
-        targetDepartment: currentHOD.department,
-        timeSlotId: '4',
-        dayOfWeek: 4,
-        courseName: 'Environmental Business Practices',
-        purpose: 'Joint lecture with geography department',
-        expectedAttendance: 35,
-        requestDate: '2024-01-24T14:20:00Z',
-        status: 'approved',
-        approvedBy: currentHOD.id,
-        responseDate: '2024-01-24T16:15:00Z',
-        notes: 'Approved for interdisciplinary collaboration',
-      },
-      // Requests sent by current HOD
-      {
-        id: 'req_3',
-        requesterId: currentHOD.id,
-        requesterDepartment: currentHOD.department,
-        targetResourceId: 'shared_1',
-        targetDepartment: 'University',
-        timeSlotId: '1',
-        dayOfWeek: 3,
-        courseName: currentHOD.department === 'Geography' ? 'Geography Conference' : 'Business Summit',
-        purpose: 'Annual department conference with external speakers',
-        expectedAttendance: 150,
-        requestDate: '2024-01-23T11:00:00Z',
-        status: 'pending',
-      },
-      {
-        id: 'req_4',
-        requesterId: currentHOD.id,
-        requesterDepartment: currentHOD.department,
-        targetResourceId: 'shared_3',
-        targetDepartment: 'University',
-        timeSlotId: '3',
-        dayOfWeek: 1,
-        courseName: 'Digital Literacy Workshop',
-        purpose: 'Training session for faculty on new software',
-        expectedAttendance: 15,
-        requestDate: '2024-01-22T09:45:00Z',
-        status: 'rejected',
-        responseDate: '2024-01-22T15:30:00Z',
-        notes: 'Lab already booked for maintenance',
-      },
-    ];
-
-    setBookingRequests(sampleRequests);
-  }, [currentHOD]);
+    
+    const fetchBookingRequests = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch requests where current department is the target
+        const receivedResponse = await BookingRequestService.getRequestsByTargetDepartment(currentHOD.department);
+        
+        // Fetch requests sent by current department
+        const sentResponse = await BookingRequestService.getRequestsByRequesterDepartment(currentHOD.department);
+        
+        if (receivedResponse.success && sentResponse.success) {
+          const allRequests = [
+            ...(receivedResponse.data || []),
+            ...(sentResponse.data || [])
+          ];
+          
+          // Remove duplicates (in case a request appears in both lists)
+          const uniqueRequests = Array.from(new Map(allRequests.map(req => [req.id, req])).values());
+          setBookingRequests(uniqueRequests);
+        } else {
+          toast({
+            title: 'Error fetching requests',
+            description: receivedResponse.message || sentResponse.message,
+            variant: 'destructive'
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching booking requests:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load booking requests. Please try again.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchBookingRequests();
+  }, [currentHOD, toast]);
 
   const receivedRequests = bookingRequests.filter(req => 
     req.targetDepartment === currentHOD?.department && req.requesterId !== currentHOD?.id
@@ -115,24 +91,50 @@ export default function BookingRequests() {
     req.requesterId === currentHOD?.id
   );
 
-  const handleResponse = (action: 'approve' | 'reject') => {
+  const handleResponse = async (action: 'approve' | 'reject') => {
     if (!selectedRequest || !currentHOD) return;
-
-    const updatedRequest: BookingRequest = {
-      ...selectedRequest,
-      status: action === 'approve' ? 'approved' : 'rejected',
-      approvedBy: currentHOD.id,
-      responseDate: new Date().toISOString(),
-      notes: responseText.trim() || undefined,
-    };
-
-    setBookingRequests(prev => prev.map(req => 
-      req.id === selectedRequest.id ? updatedRequest : req
-    ));
-
-    setResponseDialogOpen(false);
-    setSelectedRequest(null);
-    setResponseText('');
+    
+    setIsLoading(true);
+    try {
+      const statusUpdate: UpdateBookingRequestStatusRequest = {
+        status: action === 'approve' ? 'approved' : 'rejected',
+        approvedBy: currentHOD.id,
+        notes: responseText.trim() || undefined
+      };
+      
+      const response = await BookingRequestService.updateRequestStatus(selectedRequest.id, statusUpdate);
+      
+      if (response.success) {
+        // Update the local state with the updated request
+        setBookingRequests(prev => prev.map(req => 
+          req.id === selectedRequest.id ? response.data! : req
+        ));
+        
+        toast({
+          title: `Request ${action === 'approve' ? 'Approved' : 'Rejected'}`,
+          description: `The booking request has been ${action === 'approve' ? 'approved' : 'rejected'} successfully.`,
+          variant: 'default'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: response.message || `Failed to ${action} the request.`,
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing request:`, error);
+      toast({
+        title: 'Error',
+        description: `Failed to ${action} the request. Please try again.`,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+      setResponseDialogOpen(false);
+      setSelectedRequest(null);
+      setResponseText('');
+    }
   };
 
   const openResponseDialog = (request: BookingRequest, action: 'approve' | 'reject') => {
@@ -190,6 +192,16 @@ export default function BookingRequests() {
           <p className="text-slate-600 mt-1">Manage cross-department resource booking requests</p>
         </div>
       </div>
+      
+      {/* Loading indicator */}
+      {isLoading && (
+        <div className="w-full p-4 bg-blue-50 rounded-md">
+          <div className="flex items-center justify-center space-x-2">
+            <div className="h-4 w-4 bg-blue-600 rounded-full animate-pulse"></div>
+            <div className="text-blue-600">Loading...</div>
+          </div>
+        </div>
+      )}
 
       {/* Request Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -282,6 +294,7 @@ export default function BookingRequests() {
                             size="sm"
                             onClick={() => openResponseDialog(request, 'approve')}
                             className="bg-green-600 hover:bg-green-700"
+                            disabled={isLoading}
                           >
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Approve
@@ -291,6 +304,7 @@ export default function BookingRequests() {
                             variant="outline"
                             onClick={() => openResponseDialog(request, 'reject')}
                             className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                            disabled={isLoading}
                           >
                             <XCircle className="h-3 w-3 mr-1" />
                             Reject
@@ -383,11 +397,45 @@ export default function BookingRequests() {
                           size="sm"
                           variant="outline"
                           className="ml-4 text-red-600 hover:text-red-700"
-                          onClick={() => {
-                            // Withdraw request logic would go here
-                            setBookingRequests(prev => prev.map(req => 
-                              req.id === request.id ? { ...req, status: 'withdrawn' as const } : req
-                            ));
+                          disabled={isLoading}
+                          onClick={async () => {
+                            setIsLoading(true);
+                            try {
+                              const statusUpdate = {
+                                status: 'withdrawn' as const,
+                                notes: 'Request withdrawn by requester'
+                              };
+                              
+                              const response = await BookingRequestService.updateRequestStatus(request.id, statusUpdate);
+                              
+                              if (response.success) {
+                                // Update the local state with the updated request
+                                setBookingRequests(prev => prev.map(req => 
+                                  req.id === request.id ? response.data! : req
+                                ));
+                                
+                                toast({
+                                  title: 'Request Withdrawn',
+                                  description: 'The booking request has been withdrawn successfully.',
+                                  variant: 'default'
+                                });
+                              } else {
+                                toast({
+                                  title: 'Error',
+                                  description: response.message || 'Failed to withdraw the request.',
+                                  variant: 'destructive'
+                                });
+                              }
+                            } catch (error) {
+                              console.error('Error withdrawing request:', error);
+                              toast({
+                                title: 'Error',
+                                description: 'Failed to withdraw the request. Please try again.',
+                                variant: 'destructive'
+                              });
+                            } finally {
+                              setIsLoading(false);
+                            }
                           }}
                         >
                           <XCircle className="h-3 w-3 mr-1" />
@@ -452,10 +500,15 @@ export default function BookingRequests() {
             <div className="flex space-x-3">
               <Button
                 onClick={() => handleResponse(responseAction)}
-                className={responseAction === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
-                className="flex-1"
+                className={`flex-1 ${responseAction === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                disabled={isLoading}
               >
-                {responseAction === 'approve' ? (
+                {isLoading ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Processing...
+                  </>
+                ) : responseAction === 'approve' ? (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Approve Request
@@ -471,6 +524,7 @@ export default function BookingRequests() {
                 variant="outline"
                 onClick={() => setResponseDialogOpen(false)}
                 className="flex-1"
+                disabled={isLoading}
               >
                 Cancel
               </Button>

@@ -17,7 +17,7 @@ import {
   Play,
   Pause,
 } from "lucide-react";
-import { ClassSchedule, TimeSlot } from "@shared/api";
+import { ClassSchedule, TimeSlot } from "../../shared/api";
 
 interface StudentTimetableViewProps {
   studentSemester?: number;

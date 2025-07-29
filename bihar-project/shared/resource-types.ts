@@ -18,7 +18,7 @@ export interface HODUser {
 
 // Resource Types
 export interface Resource {
-  id: string;
+  id?: number;
   name: string;
   type: 'classroom' | 'seminar_hall' | 'lab' | 'conference_room';
   capacity: number;
@@ -74,6 +74,8 @@ export interface BookingRequest {
   approvedBy?: string;
   responseDate?: string;
   notes?: string;
+  vcApproved?: boolean; // Whether the VC has approved the request
+  vcResponseDate?: string; // When the VC responded
 }
 
 // Class/Course Types

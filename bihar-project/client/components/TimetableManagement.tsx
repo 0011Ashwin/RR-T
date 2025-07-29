@@ -50,7 +50,7 @@ import {
   TimeSlot,
   TimetableEntry,
   Faculty,
-} from "@shared/api";
+} from "../../shared/api";
 
 interface Classroom {
   id: string;

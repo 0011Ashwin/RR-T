@@ -21,6 +21,7 @@ import {
   XCircle,
   AlertCircle,
   TrendingUp,
+  ClipboardCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -228,7 +229,7 @@ export default function UniversityDashboard() {
         </div>
 
         {/* First Row - Core Management Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
           {/* Staff Section */}
           <div className="lg:col-span-1">
             <Card className="h-full">
@@ -338,6 +339,34 @@ export default function UniversityDashboard() {
                     className="mt-3 bg-purple-200 text-purple-800"
                   >
                     5 Programs Available
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Resource Approvals Section */}
+          <div className="lg:col-span-1">
+            <Card className="h-full hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/vc-resource-approvals')}>
+              <CardHeader className="border-b">
+                <CardTitle className="flex items-center text-white bg-amber-600 -m-6 mb-0 p-6 rounded-t-lg">
+                  <ClipboardCheck className="h-5 w-5 mr-2" />
+                  RESOURCE APPROVALS
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 bg-amber-50">
+                <div className="bg-amber-100 rounded-lg p-4 text-center">
+                  <h3 className="font-semibold text-amber-800 mb-2">
+                    Cross-Department
+                  </h3>
+                  <p className="text-sm text-amber-700">
+                    Resource Request Approvals
+                  </p>
+                  <Badge
+                    variant="secondary"
+                    className="mt-3 bg-amber-200 text-amber-800"
+                  >
+                    Pending Approvals
                   </Badge>
                 </div>
               </CardContent>
