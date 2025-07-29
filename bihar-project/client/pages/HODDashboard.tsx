@@ -231,9 +231,8 @@ export default function HODDashboard() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("adminType");
-    navigate("/");
+    logout();
+    navigate("/hod-login");
   };
 
   const getPriorityColor = (priority: string) => {
