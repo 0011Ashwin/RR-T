@@ -772,69 +772,7 @@ export default function HODDashboard() {
             </Card>
           </TabsContent>
 
-          {/* Approvals Tab */}
-          <TabsContent value="approvals" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="h-5 w-5 mr-2 text-orange-600" />
-                  Pending Approvals
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {pendingApprovals.map((approval) => (
-                  <div
-                    key={approval.id}
-                    className={`p-6 border rounded-lg ${getPriorityColor(approval.priority)}`}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <div className="font-semibold text-lg">
-                          {approval.type}
-                        </div>
-                        <div className="text-slate-600">{approval.faculty}</div>
-                      </div>
-                      <Badge
-                        variant={
-                          approval.priority === "high"
-                            ? "destructive"
-                            : "secondary"
-                        }
-                      >
-                        {approval.priority} priority
-                      </Badge>
-                    </div>
-                    <div className="mb-4">{approval.description}</div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-slate-500">
-                        Submitted:{" "}
-                        {new Date(approval.submitDate).toLocaleDateString()}
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Review
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
+
 
           {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6">
