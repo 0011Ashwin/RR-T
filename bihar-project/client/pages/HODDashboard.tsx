@@ -491,7 +491,7 @@ export default function HODDashboard() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-8 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-9 bg-white/80 backdrop-blur-sm text-xs">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
