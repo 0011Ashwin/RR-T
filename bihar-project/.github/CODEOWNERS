@@ -1,0 +1,23 @@
+# These owners will be the default owners for everything in the repo.
+# Unless a later match takes precedence, they will be requested for
+# review when someone opens a pull request.
+* @RR-T
+
+# Frontend code
+/client/ @RR-T/frontend-team
+
+# Backend code
+/server/ @RR-T/backend-team
+
+# Shared code
+/shared/ @RR-T/core-team
+
+# Configuration files
+*.config.js @RR-T/devops-team
+*.config.ts @RR-T/devops-team
+vite.config.* @RR-T/devops-team
+tsconfig.json @RR-T/devops-team
+.env* @RR-T/devops-team
+
+# GitHub workflows
+/.github/ @RR-T/devops-team

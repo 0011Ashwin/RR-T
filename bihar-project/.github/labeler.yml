@@ -1,0 +1,33 @@
+# Add 'frontend' label to any changes in the client directory
+frontend:
+  - client/**/*
+
+# Add 'backend' label to any changes in the server directory
+backend:
+  - server/**/*
+
+# Add 'shared' label to any changes in the shared directory
+shared:
+  - shared/**/*
+
+# Add 'documentation' label to any changes to markdown files
+documentation:
+  - '**/*.md'
+
+# Add 'dependencies' label to any changes to package.json or package-lock.json
+dependencies:
+  - package.json
+  - package-lock.json
+
+# Add 'configuration' label to any changes to configuration files
+configuration:
+  - '*.config.js'
+  - '*.config.ts'
+  - vite.config.*
+  - tsconfig.json
+  - .env*
+  - .github/**/*
+
+# Add 'ui' label to any changes to UI components
+ui:
+  - client/components/ui/**/*
