@@ -491,7 +491,7 @@ export default function HODDashboard() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-9 bg-white/80 backdrop-blur-sm text-xs">
+          <TabsList className="grid w-full grid-cols-7 bg-white/80 backdrop-blur-sm">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
@@ -500,18 +500,11 @@ export default function HODDashboard() {
               Overview
             </TabsTrigger>
             <TabsTrigger
-              value="university-resources"
-              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-            >
-              <Globe className="h-4 w-4 mr-2" />
-              University
-            </TabsTrigger>
-            <TabsTrigger
-              value="department-resources"
+              value="resources"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
             >
               <Building2 className="h-4 w-4 mr-2" />
-              Department
+              Resources
             </TabsTrigger>
             <TabsTrigger
               value="routine-builder"
@@ -540,13 +533,6 @@ export default function HODDashboard() {
             >
               <Users className="h-4 w-4 mr-2" />
               Faculty
-            </TabsTrigger>
-            <TabsTrigger
-              value="approvals"
-              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Approvals
             </TabsTrigger>
             <TabsTrigger
               value="profile"
