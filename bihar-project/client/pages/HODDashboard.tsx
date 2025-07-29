@@ -490,7 +490,7 @@ export default function HODDashboard() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-7 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-8 bg-white/80 backdrop-blur-sm">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
@@ -499,25 +499,32 @@ export default function HODDashboard() {
               Overview
             </TabsTrigger>
             <TabsTrigger
-              value="timetables"
+              value="university-resources"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
             >
-              <CalendarDays className="h-4 w-4 mr-2" />
-              Timetables
+              <Globe className="h-4 w-4 mr-2" />
+              University
             </TabsTrigger>
             <TabsTrigger
-              value="allotment"
-              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Class Allotment
-            </TabsTrigger>
-            <TabsTrigger
-              value="resources"
+              value="department-resources"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
             >
               <Building2 className="h-4 w-4 mr-2" />
-              Resources
+              Department
+            </TabsTrigger>
+            <TabsTrigger
+              value="routine-builder"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Routine
+            </TabsTrigger>
+            <TabsTrigger
+              value="resource-management"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Database className="h-4 w-4 mr-2" />
+              Manage
             </TabsTrigger>
             <TabsTrigger
               value="faculty"
