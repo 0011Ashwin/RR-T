@@ -43,6 +43,7 @@ import {
   Calendar,
   Wand2,
   Database,
+  Send,
 } from "lucide-react";
 import TimetableManagement from "../components/TimetableManagement";
 import ClassAllotmentModule from "../components/ClassAllotmentModule";
