@@ -49,20 +49,32 @@ import ResourceOverview from "../components/ResourceOverview";
 
 export default function HODDashboard() {
   const navigate = useNavigate();
+  const { currentHOD, logout, isAuthenticated } = useHODAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifications, setNotifications] = useState(2);
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/hod-login');
+    }
+  }, [isAuthenticated, navigate]);
+
+  if (!currentHOD) {
+    return null; // Will redirect to login
+  }
+
   const hodProfile = {
-    name: "Dr. Rajesh Kumar Singh",
-    designation: "Head of Department",
-    department: "Computer Science & Applications",
-    email: "hod.cs@university.ac.in",
+    name: currentHOD.name,
+    designation: currentHOD.designation,
+    department: currentHOD.department,
+    email: currentHOD.email,
     phone: "+91 98765 43210",
-    employeeId: "HOD001",
-    joinDate: "2018-07-15",
-    experience: "15 years",
-    avatar: "/api/placeholder/150/150",
+    employeeId: currentHOD.employeeId,
+    joinDate: currentHOD.joinDate,
+    experience: currentHOD.experience,
+    avatar: currentHOD.avatar || "/api/placeholder/150/150",
   };
 
   const departmentStats = {
