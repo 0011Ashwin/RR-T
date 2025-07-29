@@ -18,6 +18,7 @@ import UniversityResources from "./pages/UniversityResources";
 import DepartmentResources from "./pages/DepartmentResources";
 import RoutineBuilder from "./pages/RoutineBuilder";
 import ResourceManagement from "./pages/ResourceManagement";
+import BookingRequests from "./pages/BookingRequests";
 import CollegeDetails from "./pages/CollegeDetails";
 import TeachingStaff from "./pages/TeachingStaff";
 import NonTeachingStaff from "./pages/NonTeachingStaff";
