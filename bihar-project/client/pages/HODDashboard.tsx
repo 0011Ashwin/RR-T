@@ -6,6 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { useHODAuth } from "@/hooks/use-hod-auth";
+import Resources from "./Resources";
+import RoutineBuilder from "./RoutineBuilder";
+import ResourceManagement from "./ResourceManagement";
+import BookingRequests from "./BookingRequests";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -33,6 +38,11 @@ import {
   User,
   Phone,
   Mail,
+  Globe,
+  Calendar,
+  Wand2,
+  Database,
+  Send,
 } from "lucide-react";
 import TimetableManagement from "../components/TimetableManagement";
 import ClassAllotmentModule from "../components/ClassAllotmentModule";
@@ -40,20 +50,32 @@ import ResourceOverview from "../components/ResourceOverview";
 
 export default function HODDashboard() {
   const navigate = useNavigate();
+  const { currentHOD, logout, isAuthenticated } = useHODAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifications, setNotifications] = useState(2);
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/hod-login');
+    }
+  }, [isAuthenticated, navigate]);
+
+  if (!currentHOD) {
+    return null; // Will redirect to login
+  }
+
   const hodProfile = {
-    name: "Dr. Rajesh Kumar Singh",
-    designation: "Head of Department",
-    department: "Computer Science & Applications",
-    email: "hod.cs@university.ac.in",
+    name: currentHOD.name,
+    designation: currentHOD.designation,
+    department: currentHOD.department,
+    email: currentHOD.email,
     phone: "+91 98765 43210",
-    employeeId: "HOD001",
-    joinDate: "2018-07-15",
-    experience: "15 years",
-    avatar: "/api/placeholder/150/150",
+    employeeId: currentHOD.employeeId,
+    joinDate: currentHOD.joinDate,
+    experience: currentHOD.experience,
+    avatar: currentHOD.avatar || "/api/placeholder/150/150",
   };
 
   const departmentStats = {
@@ -175,32 +197,32 @@ export default function HODDashboard() {
 
   const quickActions = [
     {
-      title: "Create New Timetable",
-      icon: Plus,
-      action: () => setActiveTab("timetables"),
-      color: "bg-blue-500 hover:bg-blue-600",
-      description: "Design class schedules",
-    },
-    {
-      title: "Room Allotment",
-      icon: MapPin,
-      action: () => setActiveTab("allotment"),
-      color: "bg-green-500 hover:bg-green-600",
-      description: "Assign classrooms",
-    },
-    {
-      title: "Resource Overview",
+      title: "Resources",
       icon: Building2,
       action: () => setActiveTab("resources"),
-      color: "bg-purple-500 hover:bg-purple-600",
-      description: "Monitor resources",
+      color: "bg-blue-500 hover:bg-blue-600",
+      description: "Manage & book resources",
     },
     {
-      title: "Approve Requests",
-      icon: FileText,
-      action: () => setActiveTab("approvals"),
+      title: "Routine Builder",
+      icon: Calendar,
+      action: () => setActiveTab("routine-builder"),
+      color: "bg-green-500 hover:bg-green-600",
+      description: "Create class schedules",
+    },
+    {
+      title: "Resource Management",
+      icon: Database,
+      action: () => setActiveTab("resource-management"),
+      color: "bg-purple-500 hover:bg-purple-600",
+      description: "Add/edit resources",
+    },
+    {
+      title: "Booking Requests",
+      icon: Send,
+      action: () => setActiveTab("booking-requests"),
       color: "bg-orange-500 hover:bg-orange-600",
-      description: "Pending approvals",
+      description: "Manage requests",
     },
   ];
 
@@ -210,9 +232,8 @@ export default function HODDashboard() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("adminType");
-    navigate("/");
+    logout();
+    navigate("/hod-login");
   };
 
   const getPriorityColor = (priority: string) => {
@@ -479,20 +500,6 @@ export default function HODDashboard() {
               Overview
             </TabsTrigger>
             <TabsTrigger
-              value="timetables"
-              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-            >
-              <CalendarDays className="h-4 w-4 mr-2" />
-              Timetables
-            </TabsTrigger>
-            <TabsTrigger
-              value="allotment"
-              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Class Allotment
-            </TabsTrigger>
-            <TabsTrigger
               value="resources"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
             >
@@ -500,18 +507,32 @@ export default function HODDashboard() {
               Resources
             </TabsTrigger>
             <TabsTrigger
+              value="routine-builder"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Routine
+            </TabsTrigger>
+            <TabsTrigger
+              value="resource-management"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Database className="h-4 w-4 mr-2" />
+              Manage
+            </TabsTrigger>
+            <TabsTrigger
+              value="booking-requests"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Requests
+            </TabsTrigger>
+            <TabsTrigger
               value="faculty"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
             >
               <Users className="h-4 w-4 mr-2" />
               Faculty
-            </TabsTrigger>
-            <TabsTrigger
-              value="approvals"
-              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Approvals
             </TabsTrigger>
             <TabsTrigger
               value="profile"
@@ -627,19 +648,24 @@ export default function HODDashboard() {
             </div>
           </TabsContent>
 
-          {/* Timetables Tab */}
-          <TabsContent value="timetables" className="space-y-6">
-            <TimetableManagement />
-          </TabsContent>
-
-          {/* Class Allotment Tab */}
-          <TabsContent value="allotment" className="space-y-6">
-            <ClassAllotmentModule />
-          </TabsContent>
-
-          {/* Resource Overview Tab */}
+          {/* Resources Tab */}
           <TabsContent value="resources" className="space-y-6">
-            <ResourceOverview />
+            <Resources />
+          </TabsContent>
+
+          {/* Routine Builder Tab */}
+          <TabsContent value="routine-builder" className="space-y-6">
+            <RoutineBuilder />
+          </TabsContent>
+
+          {/* Resource Management Tab */}
+          <TabsContent value="resource-management" className="space-y-6">
+            <ResourceManagement />
+          </TabsContent>
+
+          {/* Booking Requests Tab */}
+          <TabsContent value="booking-requests" className="space-y-6">
+            <BookingRequests />
           </TabsContent>
 
           {/* Faculty Tab */}
@@ -746,69 +772,7 @@ export default function HODDashboard() {
             </Card>
           </TabsContent>
 
-          {/* Approvals Tab */}
-          <TabsContent value="approvals" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="h-5 w-5 mr-2 text-orange-600" />
-                  Pending Approvals
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {pendingApprovals.map((approval) => (
-                  <div
-                    key={approval.id}
-                    className={`p-6 border rounded-lg ${getPriorityColor(approval.priority)}`}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <div className="font-semibold text-lg">
-                          {approval.type}
-                        </div>
-                        <div className="text-slate-600">{approval.faculty}</div>
-                      </div>
-                      <Badge
-                        variant={
-                          approval.priority === "high"
-                            ? "destructive"
-                            : "secondary"
-                        }
-                      >
-                        {approval.priority} priority
-                      </Badge>
-                    </div>
-                    <div className="mb-4">{approval.description}</div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-slate-500">
-                        Submitted:{" "}
-                        {new Date(approval.submitDate).toLocaleDateString()}
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Review
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
+
 
           {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6">
