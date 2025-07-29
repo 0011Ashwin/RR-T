@@ -11,6 +11,7 @@ import UniversityResources from "./UniversityResources";
 import DepartmentResources from "./DepartmentResources";
 import RoutineBuilder from "./RoutineBuilder";
 import ResourceManagement from "./ResourceManagement";
+import BookingRequests from "./BookingRequests";
 import {
   Calendar as CalendarIcon,
   Clock,
