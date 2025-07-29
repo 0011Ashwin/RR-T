@@ -6,6 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { useHODAuth } from "@/hooks/use-hod-auth";
+import UniversityResources from "./UniversityResources";
+import DepartmentResources from "./DepartmentResources";
+import RoutineBuilder from "./RoutineBuilder";
+import ResourceManagement from "./ResourceManagement";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -33,6 +38,10 @@ import {
   User,
   Phone,
   Mail,
+  Globe,
+  Calendar,
+  Wand2,
+  Database,
 } from "lucide-react";
 import TimetableManagement from "../components/TimetableManagement";
 import ClassAllotmentModule from "../components/ClassAllotmentModule";
