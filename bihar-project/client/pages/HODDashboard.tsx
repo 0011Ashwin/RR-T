@@ -196,32 +196,32 @@ export default function HODDashboard() {
 
   const quickActions = [
     {
-      title: "Create New Timetable",
-      icon: Plus,
-      action: () => setActiveTab("timetables"),
+      title: "University Resources",
+      icon: Globe,
+      action: () => setActiveTab("university-resources"),
       color: "bg-blue-500 hover:bg-blue-600",
-      description: "Design class schedules",
+      description: "Browse shared facilities",
     },
     {
-      title: "Room Allotment",
-      icon: MapPin,
-      action: () => setActiveTab("allotment"),
-      color: "bg-green-500 hover:bg-green-600",
-      description: "Assign classrooms",
-    },
-    {
-      title: "Resource Overview",
+      title: "Department Resources",
       icon: Building2,
-      action: () => setActiveTab("resources"),
-      color: "bg-purple-500 hover:bg-purple-600",
-      description: "Monitor resources",
+      action: () => setActiveTab("department-resources"),
+      color: "bg-green-500 hover:bg-green-600",
+      description: "Manage your resources",
     },
     {
-      title: "Approve Requests",
-      icon: FileText,
-      action: () => setActiveTab("approvals"),
+      title: "Routine Builder",
+      icon: Calendar,
+      action: () => setActiveTab("routine-builder"),
+      color: "bg-purple-500 hover:bg-purple-600",
+      description: "Create class schedules",
+    },
+    {
+      title: "Resource Management",
+      icon: Database,
+      action: () => setActiveTab("resource-management"),
       color: "bg-orange-500 hover:bg-orange-600",
-      description: "Pending approvals",
+      description: "Add/edit resources",
     },
   ];
 
