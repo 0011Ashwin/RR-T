@@ -1,9 +1,11 @@
 import path from "path";
-import { createServer } from "./index";
+import { createServer } from "./index.js";
 import * as express from "express";
 
-const app = createServer();
-const port = process.env.PORT || 3000;
+// Self-executing async function to handle async createServer
+(async () => {
+  const app = await createServer();
+  const port = process.env.PORT || 3000;
 
 // In production, serve the built SPA files
 const __dirname = import.meta.dirname;
@@ -38,3 +40,5 @@ process.on("SIGINT", () => {
   console.log("🛑 Received SIGINT, shutting down gracefully");
   process.exit(0);
 });
+
+})(); // Close the async IIFE

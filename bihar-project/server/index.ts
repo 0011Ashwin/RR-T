@@ -1,15 +1,45 @@
 import express from "express";
 import cors from "cors";
-import { handleDemo } from "./routes/demo";
-import { handleChat } from "./routes/chat";
+import fs from "fs";
+import { handleDemo } from "./routes/demo.js";
+import { handleChat } from "./routes/chat.js";
+import { initializeDatabase } from "./database/index.js";
+import { departmentRouter } from "./routes/department.js";
+import { classroomRouter } from "./routes/classroom.js";
+import { facultyRouter } from "./routes/faculty.js";
+import { subjectRouter } from "./routes/subject.js";
+import { timetableRouter } from "./routes/timetable.js";
+import { resourceRouter } from "./routes/resource.js";
+import { classroomBookingRouter } from "./routes/classroom-booking.js";
+import { adminRouter } from "./routes/admin.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
-export function createServer() {
+// Get the directory name of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export async function createServer() {
   const app = express();
 
   // Middleware
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+
+  // Initialize database
+  try {
+    await initializeDatabase();
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Error initializing database:', error);
+  }
+
+  // Create data directory if it doesn't exist
+  const dataDir = path.join(__dirname, '..', '..', 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
 
   // Example API routes
   app.get("/api/ping", (_req, res) => {
@@ -18,6 +48,16 @@ export function createServer() {
 
   app.get("/api/demo", handleDemo);
   app.post("/api/chat", handleChat);
+
+  // API routes for database entities
+  app.use("/api/departments", departmentRouter);
+  app.use("/api/classrooms", classroomRouter);
+  app.use("/api/faculty", facultyRouter);
+  app.use("/api/subjects", subjectRouter);
+  app.use("/api/timetables", timetableRouter);
+  app.use("/api/resources", resourceRouter);
+  app.use("/api/classroom-bookings", classroomBookingRouter);
+  app.use("/api/admin", adminRouter);
 
   return app;
 }
