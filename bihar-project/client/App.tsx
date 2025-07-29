@@ -42,6 +42,7 @@ const App = () => (
             <Route path="/department-resources" element={<DepartmentResources />} />
             <Route path="/routine-builder" element={<RoutineBuilder />} />
             <Route path="/resource-management" element={<ResourceManagement />} />
+            <Route path="/booking-requests" element={<BookingRequests />} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/college/:collegeName" element={<CollegeDetails />} />
             <Route path="/staff/teaching" element={<TeachingStaff />} />
