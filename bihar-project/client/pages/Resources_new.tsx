@@ -37,19 +37,6 @@ import {
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Function to map legacy time slot IDs to current format
-const mapTimeSlotId = (timeSlotId: string): string => {
-  const mappings: { [key: string]: string } = {
-    'morning_1': '1',    // 08:00-09:30
-    'morning_2': '2',    // 09:30-11:00  
-    'afternoon_1': '4',  // 12:45-14:15
-    'afternoon_2': '5',  // 14:15-15:45
-    'evening_1': '6',    // 15:45-17:15
-  };
-  
-  return mappings[timeSlotId] || timeSlotId;
-};
-
 export default function Resources() {
   const { currentHOD } = useHODAuth();
   const { toast } = useToast();
@@ -60,7 +47,6 @@ export default function Resources() {
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [classSessions, setClassSessions] = useState<ClassSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showUnavailableSlots, setShowUnavailableSlots] = useState(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{
@@ -117,14 +103,6 @@ export default function Resources() {
         ];
         generateWeeklySlots(allResources);
 
-        // Force slot occupancy update after a brief delay to ensure slots are generated
-        setTimeout(() => {
-          console.log('Forcing slot occupancy update...');
-          if (weeklySlots.length > 0) {
-            console.log('Updating slot occupancy with booking requests:', bookingRequests.length);
-          }
-        }, 200);
-
       } catch (error) {
         console.error('Error loading resources:', error);
         toast({
@@ -164,9 +142,7 @@ export default function Resources() {
 
   // Update slots when class sessions or booking requests change
   useEffect(() => {
-    console.log('Slot occupancy useEffect triggered - slots:', weeklySlots.length, 'sessions:', classSessions.length, 'bookings:', bookingRequests.length);
     if (weeklySlots.length > 0) {
-      console.log('Updating slot occupancy...');
       setWeeklySlots(prev => prev.map(slot => {
         // Check for class session
         const session = classSessions.find(s =>
@@ -190,13 +166,12 @@ export default function Resources() {
         }
 
         // Check for approved booking request
-        const booking = bookingRequests.find(b => {
-          const mappedTimeSlotId = mapTimeSlotId(b.timeSlotId);
-          return String(b.targetResourceId) === String(slot.resourceId) &&
-                 String(mappedTimeSlotId) === String(slot.timeSlotId) &&
-                 b.dayOfWeek === slot.dayOfWeek &&
-                 b.status === 'approved';
-        });
+        const booking = bookingRequests.find(b =>
+          b.targetResourceId === slot.resourceId &&
+          b.timeSlotId === slot.timeSlotId &&
+          b.dayOfWeek === slot.dayOfWeek &&
+          b.status === 'approved'
+        );
 
         if (booking) {
           return {
@@ -219,7 +194,7 @@ export default function Resources() {
         };
       }));
     }
-  }, [classSessions, bookingRequests, currentHOD, weeklySlots.length]);
+  }, [classSessions, bookingRequests, currentHOD]);
 
   const getSlotForResource = (resourceId: string, timeSlotId: string, day: number) => {
     return weeklySlots.find(slot =>
@@ -227,23 +202,6 @@ export default function Resources() {
       slot.timeSlotId === timeSlotId &&
       slot.dayOfWeek === day
     );
-  };
-
-  const getAvailableSlotCount = (resources: Resource[]) => {
-    let availableCount = 0;
-    let totalCount = 0;
-    
-    resources.forEach(resource => {
-      DEFAULT_TIME_SLOTS.forEach(timeSlot => {
-        const slot = getSlotForResource(resource.id!.toString(), timeSlot.id, selectedDay);
-        totalCount++;
-        if (!slot?.isOccupied) {
-          availableCount++;
-        }
-      });
-    });
-    
-    return { availableCount, totalCount };
   };
 
   const openBookingDialog = (resource: Resource, resourceId: string, timeSlotId: string, dayOfWeek: number) => {
@@ -366,13 +324,7 @@ export default function Resources() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-6 gap-2">
-                {DEFAULT_TIME_SLOTS
-                  .filter((timeSlot) => {
-                    if (showUnavailableSlots) return true;
-                    const slot = getSlotForResource(resource.id!.toString(), timeSlot.id, selectedDay);
-                    return !slot?.isOccupied;
-                  })
-                  .map((timeSlot) => {
+                {DEFAULT_TIME_SLOTS.map((timeSlot) => {
                   const slot = getSlotForResource(resource.id!.toString(), timeSlot.id, selectedDay);
                   
                   return (
@@ -435,45 +387,23 @@ export default function Resources() {
             View and book university resources for your department
           </p>
         </div>
-        <div className="space-x-2">
-          <Button 
-            onClick={() => setShowUnavailableSlots(!showUnavailableSlots)}
-            variant={showUnavailableSlots ? "default" : "outline"}
-            className={showUnavailableSlots ? "bg-orange-600 hover:bg-orange-700" : "border-orange-300 text-orange-700 hover:bg-orange-50"}
-          >
-            {showUnavailableSlots ? "Hide" : "Show"} Unavailable Slots
-          </Button>
-        </div>
       </div>
 
       {/* Day Selector */}
-      <div className="flex justify-between items-center">
-        <div className="flex space-x-2">
-          {DAYS.slice(1, 6).map((day, index) => {
-            const dayNumber = index + 1;
-            return (
-              <Button
-                key={dayNumber}
-                variant={selectedDay === dayNumber ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedDay(dayNumber)}
-              >
-                {day}
-              </Button>
-            );
-          })}
-        </div>
-        <div className="text-sm text-slate-600">
-          {(() => {
-            const deptSlots = getAvailableSlotCount(departmentResources);
-            const uniSlots = getAvailableSlotCount(universityResources);
-            const totalAvailable = deptSlots.availableCount + uniSlots.availableCount;
-            const totalSlots = deptSlots.totalCount + uniSlots.totalCount;
-            return showUnavailableSlots 
-              ? `${totalSlots} total slots (${totalAvailable} available, ${totalSlots - totalAvailable} occupied)`
-              : `${totalAvailable} available slots`;
-          })()}
-        </div>
+      <div className="flex space-x-2">
+        {DAYS.slice(1, 6).map((day, index) => {
+          const dayNumber = index + 1;
+          return (
+            <Button
+              key={dayNumber}
+              variant={selectedDay === dayNumber ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedDay(dayNumber)}
+            >
+              {day}
+            </Button>
+          );
+        })}
       </div>
 
       {/* Resources Tabs */}

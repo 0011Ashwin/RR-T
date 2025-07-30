@@ -133,18 +133,37 @@ router.post('/', async (req, res) => {
       });
     }
     
+    // Check if this is a same-department request by an HOD
+    const isSameDepartment = bookingRequest.requesterDepartment === bookingRequest.targetDepartment;
+    const isHODRequest = bookingRequest.requesterDesignation && 
+                        (bookingRequest.requesterDesignation.includes('HOD') || 
+                         bookingRequest.requesterDesignation.includes('Head'));
+    
+    // Auto-approve if HOD is requesting resource from their own department
+    const shouldAutoApprove = isSameDepartment && isHODRequest;
+    
     // Set default values
     const newBookingRequest = {
       ...bookingRequest,
-      status: 'pending',
-      requestDate: new Date().toISOString()
+      status: shouldAutoApprove ? 'approved' : 'pending',
+      requestDate: new Date().toISOString(),
+      ...(shouldAutoApprove && {
+        approvedBy: `Auto-approved (${bookingRequest.requesterId} - Same Department HOD)`,
+        responseDate: new Date().toISOString(),
+        notes: 'Automatically approved - HOD requesting department resource'
+      })
     };
     
     const createdRequest = await BookingRequestModel.create(newBookingRequest);
+    
+    const message = shouldAutoApprove 
+      ? 'Booking request auto-approved (HOD requesting department resource)'
+      : 'Booking request created successfully';
+    
     res.status(201).json({
       success: true,
       data: createdRequest,
-      message: 'Booking request created successfully'
+      message
     });
   } catch (error) {
     console.error('Error creating booking request:', error);
@@ -241,6 +260,7 @@ router.put('/:id/vc-approval', async (req, res) => {
     
     // Update the booking request with VC approval
     const updatedRequest = await BookingRequestModel.updateStatus(id, {
+      status: currentRequest.status, // Keep the current status
       vcApproved,
       notes: notes ? `${currentRequest.notes ? currentRequest.notes + ' | ' : ''}VC: ${notes}` : undefined
     });

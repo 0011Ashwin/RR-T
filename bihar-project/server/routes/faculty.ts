@@ -7,10 +7,16 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const faculty = await FacultyModel.getAll();
-    res.json(faculty);
+    res.json({
+      success: true,
+      data: faculty
+    });
   } catch (error) {
     console.error('Error fetching faculty:', error);
-    res.status(500).json({ error: 'Failed to fetch faculty' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch faculty' 
+    });
   }
 });
 
@@ -21,13 +27,22 @@ router.get('/:id', async (req, res) => {
     const faculty = await FacultyModel.getById(id);
     
     if (!faculty) {
-      return res.status(404).json({ error: 'Faculty member not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Faculty member not found' 
+      });
     }
     
-    res.json(faculty);
+    res.json({
+      success: true,
+      data: faculty
+    });
   } catch (error) {
     console.error('Error fetching faculty member:', error);
-    res.status(500).json({ error: 'Failed to fetch faculty member' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch faculty member' 
+    });
   }
 });
 
@@ -53,10 +68,34 @@ router.get('/department/:departmentId', async (req, res) => {
   try {
     const departmentId = parseInt(req.params.departmentId);
     const faculty = await FacultyModel.getByDepartment(departmentId);
-    res.json(faculty);
+    res.json({
+      success: true,
+      data: faculty
+    });
   } catch (error) {
     console.error('Error fetching department faculty:', error);
-    res.status(500).json({ error: 'Failed to fetch department faculty' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch department faculty' 
+    });
+  }
+});
+
+// Get faculty members by department name
+router.get('/department/name/:departmentName', async (req, res) => {
+  try {
+    const departmentName = req.params.departmentName;
+    const faculty = await FacultyModel.getByDepartmentName(departmentName);
+    res.json({
+      success: true,
+      data: faculty
+    });
+  } catch (error) {
+    console.error('Error fetching department faculty:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch department faculty' 
+    });
   }
 });
 

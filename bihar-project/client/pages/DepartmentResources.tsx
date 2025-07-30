@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,8 +11,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHODAuth } from '@/hooks/use-hod-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Resource, WeeklyTimeSlot, ClassSession, Course, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
+import { BookingRequest } from '../../shared/api';
 import { ResourceService } from '@/services/resource-service';
 import { ClassSessionService } from '@/services/class-session-service';
+import { BookingRequestService } from '@/services/booking-request-service';
 import { 
   Building2, 
   Calendar, 
@@ -29,6 +31,19 @@ import {
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// Function to map legacy time slot IDs to current format
+const mapTimeSlotId = (timeSlotId: string): string => {
+  const mappings: { [key: string]: string } = {
+    'morning_1': '1',    // 08:00-09:30
+    'morning_2': '2',    // 09:30-11:00  
+    'afternoon_1': '4',  // 12:45-14:15
+    'afternoon_2': '5',  // 14:15-15:45
+    'evening_1': '6',    // 15:45-17:15
+  };
+  
+  return mappings[timeSlotId] || timeSlotId;
+};
+
 export default function DepartmentResources() {
   const { currentHOD } = useHODAuth();
   const { toast } = useToast();
@@ -37,8 +52,11 @@ export default function DepartmentResources() {
   const [weeklySlots, setWeeklySlots] = useState<WeeklyTimeSlot[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [classSessions, setClassSessions] = useState<ClassSession[]>([]);
+  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [showUnavailableSlots, setShowUnavailableSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{
     resourceId: string;
     timeSlotId: string;
@@ -59,17 +77,35 @@ export default function DepartmentResources() {
       
       setLoading(true);
       try {
-        // Load department resources
-        const resourcesResponse = await ResourceService.getResourcesByDepartment(currentHOD.department);
+        // Load all data concurrently
+        const [resourcesResponse, sessionsResponse, bookingResponse] = await Promise.all([
+          ResourceService.getResourcesByDepartment(currentHOD.department),
+          ClassSessionService.getSessionsByDepartment(currentHOD.department),
+          BookingRequestService.getAllRequests()
+        ]);
+
+        // Set resources
         if (resourcesResponse.success && resourcesResponse.data) {
           setResources(resourcesResponse.data);
-          generateWeeklySlots(resourcesResponse.data);
         }
 
-        // Load class sessions
-        const sessionsResponse = await ClassSessionService.getSessionsByDepartment(currentHOD.department);
+        // Set class sessions
         if (sessionsResponse.success && sessionsResponse.data) {
           setClassSessions(sessionsResponse.data);
+        }
+
+        // Set booking requests
+        if (bookingResponse.success && bookingResponse.data) {
+          // Filter to show relevant booking requests (approved ones affecting this department)
+          const relevantBookings = bookingResponse.data.filter(req => 
+            req.targetDepartment === currentHOD.department || req.requesterDepartment === currentHOD.department
+          );
+          setBookingRequests(relevantBookings);
+        }
+
+        // Generate initial weekly slots after all data is loaded
+        if (resourcesResponse.success && resourcesResponse.data) {
+          generateWeeklySlots(resourcesResponse.data);
         }
 
         // Load courses (mock data for now - you can create a course service)
@@ -100,6 +136,12 @@ export default function DepartmentResources() {
           },
           // Add more courses as needed
         ]);
+
+        // Update slot occupancy after all data is loaded
+        // Use setTimeout to ensure all state updates have been processed
+        setTimeout(() => {
+          updateSlotOccupancy();
+        }, 200);
       } catch (error) {
         console.error('Error loading department resources:', error);
         toast({
@@ -137,41 +179,72 @@ export default function DepartmentResources() {
     setWeeklySlots(slots);
   };
 
-  // Update slots when class sessions change
-  useEffect(() => {
-    if (classSessions.length > 0) {
-      setWeeklySlots(prev => prev.map(slot => {
-        const session = classSessions.find(s =>
-          s.resourceId === slot.resourceId &&
-          s.timeSlotId === slot.timeSlotId &&
-          s.dayOfWeek === slot.dayOfWeek
-        );
+  // Function to update slot occupancy based on current data
+  const updateSlotOccupancy = useCallback(() => {
+    setSlotsLoading(true);
+    
+    setWeeklySlots(prev => prev.map(slot => {
+      // Check for class sessions first
+      const session = classSessions.find(s =>
+        s.resourceId === slot.resourceId &&
+        s.timeSlotId === slot.timeSlotId &&
+        s.dayOfWeek === slot.dayOfWeek
+      );
 
-        if (session) {
-          const course = courses.find(c => c.id === session.courseId);
-          return {
-            ...slot,
-            isOccupied: true,
-            occupiedBy: {
-              courseId: session.courseId,
-              courseName: course?.name || 'Unknown Course',
-              department: currentHOD?.department || '',
-              faculty: session.faculty,
-              classSize: course?.expectedSize || 0,
-            }
-          };
-        }
-
+      if (session) {
+        const course = courses.find(c => c.id === session.courseId);
         return {
           ...slot,
-          isOccupied: false,
-          occupiedBy: undefined,
+          isOccupied: true,
+          occupiedBy: {
+            courseId: session.courseId,
+            courseName: course?.name || 'Unknown Course',
+            department: currentHOD?.department || '',
+            faculty: session.faculty,
+            classSize: course?.expectedSize || 0,
+          }
         };
-      }));
-    }
-  }, [classSessions, courses, currentHOD]);
+      }
 
-  const getSlotForResource = (resourceId: string, timeSlotId: string, day: number) => {
+      // Check for approved booking requests
+      const approvedBooking = bookingRequests.find(b => {
+        const mappedTimeSlotId = mapTimeSlotId(b.timeSlotId);
+        return String(b.targetResourceId) === String(slot.resourceId) &&
+               String(mappedTimeSlotId) === String(slot.timeSlotId) &&
+               b.dayOfWeek === slot.dayOfWeek &&
+               b.status === 'approved';
+      });
+
+      if (approvedBooking) {
+        return {
+          ...slot,
+          isOccupied: true,
+          occupiedBy: {
+            courseId: '',
+            courseName: approvedBooking.courseName || 'External Booking',
+            department: approvedBooking.requesterDepartment,
+            faculty: approvedBooking.requesterId || 'External Faculty',
+            classSize: approvedBooking.expectedAttendance || 0,
+          }
+        };
+      }
+
+      return {
+        ...slot,
+        isOccupied: false,
+        occupiedBy: undefined,
+      };
+    }));
+    setSlotsLoading(false);
+  }, [classSessions, bookingRequests, courses, currentHOD]);
+
+  // Update slots when class sessions or booking requests change
+  useEffect(() => {
+    // Only update if we have initial slots generated
+    if (weeklySlots.length > 0) {
+      updateSlotOccupancy();
+    }
+  }, [weeklySlots.length, bookingRequests, classSessions, updateSlotOccupancy]);  const getSlotForResource = (resourceId: string, timeSlotId: string, day: number) => {
     return weeklySlots.find(slot =>
       slot.resourceId === resourceId &&
       slot.timeSlotId === timeSlotId &&
@@ -185,6 +258,23 @@ export default function DepartmentResources() {
       session.timeSlotId === timeSlotId &&
       session.dayOfWeek === dayOfWeek
     );
+  };
+
+  const getAvailableSlotCount = () => {
+    let availableCount = 0;
+    let totalCount = 0;
+    
+    resources.forEach(resource => {
+      DEFAULT_TIME_SLOTS.forEach(timeSlot => {
+        const slot = getSlotForResource(resource.id!.toString(), timeSlot.id, selectedDay);
+        totalCount++;
+        if (!slot?.isOccupied) {
+          availableCount++;
+        }
+      });
+    });
+    
+    return { availableCount, totalCount };
   };
 
   const checkConflicts = (resourceId: string, timeSlotId: string, dayOfWeek: number, faculty: string) => {
@@ -390,28 +480,63 @@ export default function DepartmentResources() {
           </p>
         </div>
         <div className="flex space-x-3">
+          <Button 
+            onClick={updateSlotOccupancy} 
+            variant="outline" 
+            disabled={slotsLoading}
+            className="bg-blue-50 hover:bg-blue-100"
+          >
+            {slotsLoading ? (
+              <>
+                <Clock className="h-4 w-4 mr-2 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              <>
+                <Clock className="h-4 w-4 mr-2" />
+                Refresh Slots
+              </>
+            )}
+          </Button>
           <Button onClick={handleAutoGenerate} className="bg-purple-600 hover:bg-purple-700">
             <Wand2 className="h-4 w-4 mr-2" />
             Auto Generate Routine
+          </Button>
+          <Button 
+            onClick={() => setShowUnavailableSlots(!showUnavailableSlots)}
+            variant={showUnavailableSlots ? "default" : "outline"}
+            className={showUnavailableSlots ? "bg-orange-600 hover:bg-orange-700" : "border-orange-300 text-orange-700 hover:bg-orange-50"}
+          >
+            {showUnavailableSlots ? "Hide" : "Show"} Unavailable Slots
           </Button>
         </div>
       </div>
 
       {/* Day Selector */}
-      <div className="flex space-x-2">
-        {DAYS.slice(1, 6).map((day, index) => {
-          const dayNumber = index + 1;
-          return (
-            <Button
-              key={dayNumber}
-              variant={selectedDay === dayNumber ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedDay(dayNumber)}
-            >
-              {day}
-            </Button>
-          );
-        })}
+      <div className="flex justify-between items-center">
+        <div className="flex space-x-2">
+          {DAYS.slice(1, 6).map((day, index) => {
+            const dayNumber = index + 1;
+            return (
+              <Button
+                key={dayNumber}
+                variant={selectedDay === dayNumber ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedDay(dayNumber)}
+              >
+                {day}
+              </Button>
+            );
+          })}
+        </div>
+        <div className="text-sm text-slate-600">
+          {(() => {
+            const { availableCount, totalCount } = getAvailableSlotCount();
+            return showUnavailableSlots 
+              ? `${totalCount} total slots (${availableCount} available, ${totalCount - availableCount} occupied)`
+              : `${availableCount} available slots`;
+          })()}
+        </div>
       </div>
 
       {/* Resources Grid */}
@@ -436,7 +561,13 @@ export default function DepartmentResources() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-6 gap-2">
-                {DEFAULT_TIME_SLOTS.map((timeSlot) => {
+                {DEFAULT_TIME_SLOTS
+                  .filter((timeSlot) => {
+                    if (showUnavailableSlots) return true;
+                    const slot = getSlotForResource(resource.id!.toString(), timeSlot.id, selectedDay);
+                    return !slot?.isOccupied;
+                  })
+                  .map((timeSlot) => {
                   const slot = getSlotForResource(resource.id!.toString(), timeSlot.id, selectedDay);
                   const session = getSessionForSlot(resource.id!.toString(), timeSlot.id, selectedDay);
                   
@@ -444,10 +575,10 @@ export default function DepartmentResources() {
                     <div
                       key={timeSlot.id}
                       className={`
-                        p-3 rounded-lg border cursor-pointer transition-all
+                        p-3 rounded-lg border cursor-pointer transition-all relative
                         ${slot?.isOccupied 
-                          ? 'bg-red-50 border-red-200 hover:bg-red-100' 
-                          : 'bg-green-50 border-green-200 hover:bg-green-100'
+                          ? 'bg-red-50 border-red-300 hover:bg-red-100 shadow-sm' 
+                          : 'bg-green-50 border-green-300 hover:bg-green-100'
                         }
                       `}
                       onClick={() => {
@@ -463,11 +594,18 @@ export default function DepartmentResources() {
                       </div>
                       {slot?.isOccupied && slot.occupiedBy ? (
                         <div className="mt-1">
-                          <div className="text-xs font-medium text-slate-900">
+                          <div className="flex items-center mb-1">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                            <span className="text-xs font-bold text-red-700">OCCUPIED</span>
+                          </div>
+                          <div className="text-xs font-medium text-slate-900 truncate" title={slot.occupiedBy.courseName}>
                             {slot.occupiedBy.courseName}
                           </div>
-                          <div className="text-xs text-slate-600">
+                          <div className="text-xs text-slate-600 truncate" title={slot.occupiedBy.faculty}>
                             {slot.occupiedBy.faculty}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {slot.occupiedBy.classSize} students
                           </div>
                           {session && (
                             <Button
@@ -484,7 +622,12 @@ export default function DepartmentResources() {
                           )}
                         </div>
                       ) : (
-                        <div className="text-xs text-green-600 mt-1">Available</div>
+                        <div className="mt-1">
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                            <span className="text-xs font-medium text-green-700">Available</span>
+                          </div>
+                        </div>
                       )}
                     </div>
                   );
@@ -494,6 +637,42 @@ export default function DepartmentResources() {
           </Card>
         ))}
       </div>
+
+      {/* Legend */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center space-x-8">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-green-50 border-2 border-green-300 rounded"></div>
+              <span className="text-sm font-medium text-slate-700">Available Slot</span>
+            </div>
+            {showUnavailableSlots && (
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-red-50 border-2 border-red-300 rounded"></div>
+                <span className="text-sm font-medium text-slate-700">Occupied Slot</span>
+              </div>
+            )}
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-sm text-slate-600">Available</span>
+            </div>
+            {showUnavailableSlots && (
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                <span className="text-sm text-slate-600">Occupied</span>
+              </div>
+            )}
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-slate-500">
+                {showUnavailableSlots 
+                  ? "Showing all slots" 
+                  : "Showing available slots only"
+                }
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Allocation Dialog */}
       <Dialog open={allocationDialogOpen} onOpenChange={setAllocationDialogOpen}>

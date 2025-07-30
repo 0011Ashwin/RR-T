@@ -37,10 +37,34 @@ router.get('/department/:departmentId', async (req, res) => {
   try {
     const departmentId = parseInt(req.params.departmentId);
     const timetables = await TimetableModel.getByDepartment(departmentId);
-    res.json(timetables);
+    res.json({
+      success: true,
+      data: timetables
+    });
   } catch (error) {
     console.error('Error fetching department timetables:', error);
-    res.status(500).json({ error: 'Failed to fetch department timetables' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch department timetables' 
+    });
+  }
+});
+
+// Get timetables by department name
+router.get('/department/name/:department', async (req, res) => {
+  try {
+    const department = req.params.department;
+    const timetables = await TimetableModel.getByDepartmentName(department);
+    res.json({
+      success: true,
+      data: timetables
+    });
+  } catch (error) {
+    console.error('Error fetching department timetables:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch department timetables' 
+    });
   }
 });
 

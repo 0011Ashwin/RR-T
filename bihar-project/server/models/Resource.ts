@@ -56,6 +56,23 @@ export class ResourceModel {
       });
   }
 
+  static async getByDepartmentName(departmentName: string) {
+    return db('resources')
+      .join('departments', 'resources.department_id', 'departments.id')
+      .where('departments.name', departmentName)
+      .select('resources.*', 'departments.name as department_name')
+      .then(resources => {
+        return resources.map(resource => ({
+          ...resource,
+          department: resource.department_name,
+          isShared: resource.is_shared,
+          isActive: resource.is_active,
+          equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
+          facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
+        }));
+      });
+  }
+
   static async create(resource: Resource) {
     const resourceToInsert = {
       ...resource,
@@ -93,6 +110,23 @@ export class ResourceModel {
       .then(resources => {
         return resources.map(resource => ({
           ...resource,
+          equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
+          facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
+        }));
+      });
+  }
+
+  static async getSharedResources() {
+    return db('resources')
+      .join('departments', 'resources.department_id', 'departments.id')
+      .where('resources.is_shared', true)
+      .select('resources.*', 'departments.name as department_name')
+      .then(resources => {
+        return resources.map(resource => ({
+          ...resource,
+          department: resource.department_name,
+          isShared: resource.is_shared,
+          isActive: resource.is_active,
           equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
           facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
         }));

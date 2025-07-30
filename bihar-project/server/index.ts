@@ -15,6 +15,7 @@ import { adminRouter } from "./routes/admin.js";
 import { bookingRequestRouter } from "./routes/booking-request.js";
 import { classSessionRouter } from "./routes/class-session.js";
 import { timeslotRouter } from "./routes/timeslot.js";
+import { hodRouter } from "./routes/hod.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -57,6 +58,7 @@ export async function createServer() {
   app.use("/api/departments", departmentRouter);
   app.use("/api/classrooms", classroomRouter);
   app.use("/api/faculty", facultyRouter);
+  app.use("/api/hods", hodRouter);
   app.use("/api/subjects", subjectRouter);
   app.use("/api/timetables", timetableRouter);
   app.use("/api/resources", resourceRouter);

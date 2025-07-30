@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHODAuth } from '@/hooks/use-hod-auth';
+import { useToast } from '@/hooks/use-toast';
 import { Resource } from '../../shared/resource-types';
+import { ResourceService } from '@/services/resource-service';
 import { 
   Building2,
   Plus,
@@ -42,6 +44,7 @@ const COMMON_FACILITIES = [
 
 export default function ResourceManagement() {
   const { currentHOD, allHODs } = useHODAuth();
+  const { toast } = useToast();
   const [resources, setResources] = useState<Resource[]>([]);
   const [filteredResources, setFilteredResources] = useState<Resource[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,7 +52,7 @@ export default function ResourceManagement() {
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [resourceForm, setResourceForm] = useState({
     name: '',
@@ -65,21 +68,32 @@ export default function ResourceManagement() {
   // Fetch resources from API
   useEffect(() => {
     const fetchResources = async () => {
+      setIsLoading(true);
       try {
-        const response = await fetch('/api/resources');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        const response = await ResourceService.getAllResources();
+        if (response.success && response.data) {
+          setResources(response.data);
+          setFilteredResources(response.data);
+        } else {
+          toast({
+            title: 'Error fetching resources',
+            description: response.message || 'Failed to load resources',
+            variant: 'destructive'
+          });
         }
-        const data = await response.json();
-        setResources(data);
-        setFilteredResources(data);
       } catch (error) {
         console.error('Error fetching resources:', error);
-        setErrors(['Failed to load resources. Please try again later.']);
+        toast({
+          title: 'Error',
+          description: 'Failed to load resources. Please try again later.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchResources();
-  }, []);
+  }, [toast]);
 
   // Filter resources based on search and filters
   useEffect(() => {
@@ -130,7 +144,6 @@ export default function ResourceManagement() {
         customFacility: '',
       });
     }
-    setErrors([]);
     setEditDialogOpen(true);
   };
 
@@ -170,11 +183,16 @@ export default function ResourceManagement() {
   const saveResource = async () => {
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
-      setErrors(validationErrors);
+      toast({
+        title: 'Validation Error',
+        description: validationErrors.join(', '),
+        variant: 'destructive'
+      });
       return;
     }
 
-    const resourceData: Omit<Resource, 'id' | 'createdAt' | 'updatedAt'> = {
+    setIsLoading(true);
+    const resourceData = {
       name: resourceForm.name.trim(),
       type: resourceForm.type as Resource['type'],
       capacity: parseInt(resourceForm.capacity),
@@ -182,58 +200,61 @@ export default function ResourceManagement() {
       location: resourceForm.location.trim() || undefined,
       facilities: resourceForm.facilities.length > 0 ? resourceForm.facilities : undefined,
       isShared: resourceForm.isShared,
-      isActive: true,
     };
 
-    if (editingResource) {
-      // Update existing resource
-      const updatedResource: Resource = {
-        ...resourceData,
-        id: editingResource.id,
-        createdAt: editingResource.createdAt,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      try {
-        const response = await fetch(`/api/resources/${editingResource.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updatedResource),
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+    try {
+      if (editingResource) {
+        // Update existing resource
+        const updateData = {
+          ...resourceData,
+          id: editingResource.id
+        };
+        
+        const response = await ResourceService.updateResource(updateData);
+        if (response.success && response.data) {
+          setResources(prev => prev.map(r => r.id === response.data!.id ? response.data! : r));
+          toast({
+            title: 'Resource Updated',
+            description: 'The resource has been updated successfully.',
+            variant: 'default'
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: response.message || 'Failed to update resource',
+            variant: 'destructive'
+          });
+          return;
         }
-        const updatedResourceFromServer = await response.json();
-        setResources(prev => prev.map(r => r.id === updatedResourceFromServer.id ? updatedResourceFromServer : r));
-        setErrors([]);
-      } catch (error) {
-        console.error('Error updating resource:', error);
-        setErrors(['Failed to update resource. Please try again.']);
-        return;
-      }
-    } else {
-      // Create new resource via API
-      try {
-        const response = await fetch('/api/resources', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(resourceData),
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      } else {
+        // Create new resource
+        const response = await ResourceService.createResource(resourceData);
+        if (response.success && response.data) {
+          setResources(prev => [...prev, response.data!]);
+          toast({
+            title: 'Resource Created',
+            description: 'The resource has been created successfully.',
+            variant: 'default'
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: response.message || 'Failed to create resource',
+            variant: 'destructive'
+          });
+          return;
         }
-        const newResource = await response.json();
-        setResources(prev => [...prev, newResource]);
-        setErrors([]); // Clear errors on success
-      } catch (error) {
-        console.error('Error creating resource:', error);
-        setErrors(['Failed to create resource. Please try again.']);
-        return; // Prevent dialog from closing on error
       }
+    } catch (error) {
+      console.error('Error saving resource:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save resource. Please try again.',
+        variant: 'destructive'
+      });
+      return;
+    } finally {
+      setIsLoading(false);
     }
 
     setEditDialogOpen(false);
@@ -241,51 +262,72 @@ export default function ResourceManagement() {
 
   const deleteResource = async (resource: Resource) => {
     if (resource.department !== currentHOD?.department && !resource.isShared) {
-      alert('You can only delete resources from your own department.');
+      toast({
+        title: 'Access Denied',
+        description: 'You can only delete resources from your own department.',
+        variant: 'destructive'
+      });
       return;
     }
 
     if (confirm(`Are you sure you want to delete "${resource.name}"?`)) {
+      setIsLoading(true);
       try {
-        const response = await fetch(`/api/resources/${resource.id}`, {
-          method: 'DELETE',
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        const response = await ResourceService.deleteResource(resource.id!);
+        if (response.success) {
+          setResources(prev => prev.filter(r => r.id !== resource.id));
+          toast({
+            title: 'Resource Deleted',
+            description: 'The resource has been deleted successfully.',
+            variant: 'default'
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: response.message || 'Failed to delete resource',
+            variant: 'destructive'
+          });
         }
-        setResources(prev => prev.filter(r => r.id !== resource.id));
-        setErrors([]);
       } catch (error) {
         console.error('Error deleting resource:', error);
-        setErrors(['Failed to delete resource. Please try again.']);
+        toast({
+          title: 'Error',
+          description: 'Failed to delete resource. Please try again.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
       }
     }
   };
 
   const toggleResourceStatus = async (resource: Resource) => {
-    const updatedResource = {
-      ...resource,
-      isActive: !resource.isActive,
-      updatedAt: new Date().toISOString(),
-    };
-    
+    setIsLoading(true);
     try {
-      const response = await fetch(`/api/resources/${resource.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedResource),
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await ResourceService.toggleResourceStatus(resource.id!, !resource.isActive);
+      if (response.success && response.data) {
+        setResources(prev => prev.map(r => r.id === response.data!.id ? response.data! : r));
+        toast({
+          title: 'Status Updated',
+          description: `Resource has been ${!resource.isActive ? 'activated' : 'deactivated'}.`,
+          variant: 'default'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: response.message || 'Failed to update resource status',
+          variant: 'destructive'
+        });
       }
-      const updatedResourceFromServer = await response.json();
-      setResources(prev => prev.map(r => r.id === updatedResourceFromServer.id ? updatedResourceFromServer : r));
-      setErrors([]);
     } catch (error) {
       console.error('Error toggling resource status:', error);
-      setErrors(['Failed to update resource status. Please try again.']);
+      toast({
+        title: 'Error',
+        description: 'Failed to update resource status. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -564,18 +606,6 @@ export default function ResourceManagement() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {errors.length > 0 && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <ul className="list-disc list-inside space-y-1">
-                    {errors.map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

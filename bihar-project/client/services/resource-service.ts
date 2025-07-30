@@ -39,7 +39,7 @@ export const ResourceService = {
    */
   getResourcesByDepartment: async (department: string): Promise<ResourceListResponse> => {
     try {
-      const response = await axios.get<ResourceListResponse>(`${API_URL}/department/${department}`);
+      const response = await axios.get<ResourceListResponse>(`${API_URL}/department/name/${department}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching resources for department ${department}:`, error);

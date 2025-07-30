@@ -112,6 +112,7 @@ export interface BookingRequest {
   id: string;
   requesterId: string;
   requesterDepartment: string;
+  requesterDesignation?: string; // Added to identify HODs
   targetResourceId: string;
   targetDepartment: string;
   timeSlotId: string;
@@ -129,6 +130,7 @@ export interface BookingRequest {
 export interface CreateBookingRequestRequest {
   requesterId: string;
   requesterDepartment: string;
+  requesterDesignation?: string; // Added to identify HODs
   targetResourceId: string;
   targetDepartment: string;
   timeSlotId: string;

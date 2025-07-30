@@ -27,6 +27,13 @@ export class FacultyModel {
     return db('faculty').where({ department_id: departmentId }).select('*');
   }
 
+  static async getByDepartmentName(departmentName: string) {
+    return db('faculty')
+      .join('departments', 'faculty.department_id', 'departments.id')
+      .where('departments.name', departmentName)
+      .select('faculty.*', 'departments.name as department_name');
+  }
+
   static async create(faculty: Faculty) {
     const [id] = await db('faculty').insert(faculty);
     return this.getById(id);
@@ -54,5 +61,49 @@ export class FacultyModel {
       ...faculty,
       subjects,
     };
+  }
+
+  // HOD-specific methods
+  static async getHODs() {
+    return db('faculty')
+      .join('departments', 'faculty.department_id', 'departments.id')
+      .where('faculty.designation', 'like', '%HOD%')
+      .orWhere('faculty.designation', 'like', '%Head%')
+      .select('faculty.*', 'departments.name as department_name');
+  }
+
+  static async getHODByEmail(email: string) {
+    return db('faculty')
+      .join('departments', 'faculty.department_id', 'departments.id')
+      .where('faculty.email', email)
+      .where(function() {
+        this.where('faculty.designation', 'like', '%HOD%')
+            .orWhere('faculty.designation', 'like', '%Head%');
+      })
+      .select('faculty.*', 'departments.name as department_name')
+      .first();
+  }
+
+  static async getHODById(id: number) {
+    return db('faculty')
+      .join('departments', 'faculty.department_id', 'departments.id')
+      .where('faculty.id', id)
+      .where(function() {
+        this.where('faculty.designation', 'like', '%HOD%')
+            .orWhere('faculty.designation', 'like', '%Head%');
+      })
+      .select('faculty.*', 'departments.name as department_name')
+      .first();
+  }
+
+  static async getHODsByDepartment(departmentName: string) {
+    return db('faculty')
+      .join('departments', 'faculty.department_id', 'departments.id')
+      .where('departments.name', departmentName)
+      .where(function() {
+        this.where('faculty.designation', 'like', '%HOD%')
+            .orWhere('faculty.designation', 'like', '%Head%');
+      })
+      .select('faculty.*', 'departments.name as department_name');
   }
 }

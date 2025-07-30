@@ -46,6 +46,13 @@ export class TimetableModel {
     return db('timetables').where({ department_id: departmentId }).select('*');
   }
 
+  static async getByDepartmentName(departmentName: string) {
+    return db('timetables')
+      .join('departments', 'timetables.department_id', 'departments.id')
+      .where('departments.name', departmentName)
+      .select('timetables.*', 'departments.name as department_name');
+  }
+
   static async create(timetable: Timetable) {
     const [id] = await db('timetables').insert(timetable);
     return this.getById(id);

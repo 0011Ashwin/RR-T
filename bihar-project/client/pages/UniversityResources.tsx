@@ -131,6 +131,7 @@ export default function UniversityResources() {
       const newRequest = {
         requesterId: currentHOD.id,
         requesterDepartment: currentHOD.department,
+        requesterDesignation: currentHOD.designation, // Added for auto-approval logic
         targetResourceId: selectedResource.id!.toString(),
         targetDepartment: selectedResource.department,
         timeSlotId: bookingForm.timeSlotId,

@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useHODAuth } from "@/hooks/use-hod-auth";
+import { useToast } from "@/hooks/use-toast";
+import { FacultyService, Faculty } from "@/services/faculty-service";
+import { TimetableService } from "@/services/timetable-service";
 import Resources from "./Resources";
 import RoutineBuilder from "./RoutineBuilder";
 import ResourceManagement from "./ResourceManagement";
@@ -51,9 +54,13 @@ import ResourceOverview from "../components/ResourceOverview";
 export default function HODDashboard() {
   const navigate = useNavigate();
   const { currentHOD, logout, isAuthenticated } = useHODAuth();
+  const { toast } = useToast();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifications, setNotifications] = useState(2);
   const [activeTab, setActiveTab] = useState("overview");
+  const [facultyMembers, setFacultyMembers] = useState<Faculty[]>([]);
+  const [timetables, setTimetables] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -61,6 +68,56 @@ export default function HODDashboard() {
       navigate('/hod-login');
     }
   }, [isAuthenticated, navigate]);
+
+  // Fetch faculty data
+  useEffect(() => {
+    if (!currentHOD) return;
+    
+    const fetchFacultyData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await FacultyService.getFacultyByDepartmentName(currentHOD.department);
+        if (response.success && response.data) {
+          setFacultyMembers(response.data);
+        } else {
+          toast({
+            title: 'Error fetching faculty',
+            description: response.message || 'Failed to load faculty data',
+            variant: 'destructive'
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching faculty:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load faculty data. Please try again.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFacultyData();
+  }, [currentHOD, toast]);
+
+  // Fetch timetables data
+  useEffect(() => {
+    if (!currentHOD) return;
+    
+    const fetchTimetables = async () => {
+      try {
+        const response = await TimetableService.getTimetablesByDepartment(currentHOD.department);
+        if (response.success && response.data) {
+          setTimetables(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching timetables:', error);
+      }
+    };
+
+    fetchTimetables();
+  }, [currentHOD]);
 
   if (!currentHOD) {
     return null; // Will redirect to login
@@ -80,60 +137,12 @@ export default function HODDashboard() {
 
   const departmentStats = {
     totalStudents: 480,
-    totalFaculty: 25,
+    totalFaculty: facultyMembers.length,
     totalSubjects: 45,
     activeSemesters: 6,
-    timetablesCreated: 12,
+    timetablesCreated: timetables.length,
     pendingApprovals: 3,
   };
-
-  const facultyMembers = [
-    {
-      id: "1",
-      name: "Dr. Priya Sharma",
-      designation: "Associate Professor",
-      subjects: ["Database Management", "Data Mining"],
-      email: "priya.sharma@university.ac.in",
-      phone: "+91 98765 43211",
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Prof. Amit Singh",
-      designation: "Assistant Professor",
-      subjects: ["Web Development", "Software Engineering"],
-      email: "amit.singh@university.ac.in",
-      phone: "+91 98765 43212",
-      status: "active",
-    },
-    {
-      id: "3",
-      name: "Dr. Neha Gupta",
-      designation: "Associate Professor",
-      subjects: ["Data Structures", "Algorithms"],
-      email: "neha.gupta@university.ac.in",
-      phone: "+91 98765 43213",
-      status: "active",
-    },
-    {
-      id: "4",
-      name: "Prof. Rajesh Kumar",
-      designation: "Assistant Professor",
-      subjects: ["Computer Networks", "Operating Systems"],
-      email: "rajesh.kumar@university.ac.in",
-      phone: "+91 98765 43214",
-      status: "active",
-    },
-    {
-      id: "5",
-      name: "Dr. Sunita Rani",
-      designation: "Professor",
-      subjects: ["Software Engineering", "Project Management"],
-      email: "sunita.rani@university.ac.in",
-      phone: "+91 98765 43215",
-      status: "active",
-    },
-  ];
 
   const recentTimetables = [
     {
@@ -714,7 +723,7 @@ export default function HODDashboard() {
                             variant="outline"
                             className="text-green-600 border-green-200"
                           >
-                            {faculty.status}
+                            Active
                           </Badge>
                         </div>
 
@@ -725,7 +734,7 @@ export default function HODDashboard() {
                           </div>
                           <div className="flex items-center text-sm text-slate-600">
                             <Phone className="h-4 w-4 mr-2" />
-                            {faculty.phone}
+                            {faculty.phone || 'Not provided'}
                           </div>
                         </div>
 
@@ -734,15 +743,19 @@ export default function HODDashboard() {
                             Subjects:
                           </div>
                           <div className="flex flex-wrap gap-1">
-                            {faculty.subjects.map((subject, index) => (
-                              <Badge
-                                key={index}
-                                variant="secondary"
-                                className="text-xs"
-                              >
-                                {subject}
-                              </Badge>
-                            ))}
+                            {faculty.subjects && faculty.subjects.length > 0 ? (
+                              faculty.subjects.map((subject, index) => (
+                                <Badge
+                                  key={index}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  {subject}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-sm text-slate-500">No subjects assigned</span>
+                            )}
                           </div>
                         </div>
 

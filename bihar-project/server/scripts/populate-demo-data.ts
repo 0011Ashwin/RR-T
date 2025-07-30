@@ -29,16 +29,22 @@ export async function populateDemoData() {
     // 2. Insert Faculty
     console.log('Inserting faculty...');
     const faculty = [
-      { name: 'Dr. Rajesh Kumar Singh', email: 'rajesh.singh@biharuniv.edu', department_id: 1 },
-      { name: 'Dr. Anita Sharma', email: 'anita.sharma@biharuniv.edu', department_id: 1 },
-      { name: 'Dr. Manoj Kumar', email: 'manoj.kumar@biharuniv.edu', department_id: 1 },
-      { name: 'Dr. Priya Sharma', email: 'priya.sharma@biharuniv.edu', department_id: 2 },
-      { name: 'Dr. Suresh Gupta', email: 'suresh.gupta@biharuniv.edu', department_id: 2 },
-      { name: 'Dr. Amit Singh', email: 'amit.singh@biharuniv.edu', department_id: 3 },
-      { name: 'Dr. Ravi Kumar', email: 'ravi.kumar@biharuniv.edu', department_id: 3 },
-      { name: 'Dr. Neha Gupta', email: 'neha.gupta@biharuniv.edu', department_id: 4 },
-      { name: 'Dr. Sunita Rani', email: 'sunita.rani@biharuniv.edu', department_id: 5 },
-      { name: 'Dr. Vikram Singh', email: 'vikram.singh@biharuniv.edu', department_id: 6 },
+      // HODs with proper designations
+      { name: 'Dr. Rajesh Kumar Singh', email: 'rajesh.singh@biharuniv.edu', department_id: 1, designation: 'HOD Computer Science' },
+      { name: 'Dr. Priya Sharma', email: 'priya.sharma@biharuniv.edu', department_id: 2, designation: 'HOD Mathematics' },
+      { name: 'Dr. Amit Singh', email: 'amit.singh@biharuniv.edu', department_id: 3, designation: 'HOD Physics' },
+      { name: 'Dr. Neha Gupta', email: 'neha.gupta@biharuniv.edu', department_id: 4, designation: 'HOD Chemistry' },
+      { name: 'Dr. Sunita Rani', email: 'sunita.rani@biharuniv.edu', department_id: 5, designation: 'HOD English' },
+      { name: 'Dr. Vikram Singh', email: 'vikram.singh@biharuniv.edu', department_id: 6, designation: 'HOD Geography' },
+      
+      // Demo HOD for testing
+      { name: 'Prof. Demo HOD', email: 'hod@example.com', department_id: 1, designation: 'Head of Department' },
+      
+      // Regular Faculty
+      { name: 'Dr. Anita Sharma', email: 'anita.sharma@biharuniv.edu', department_id: 1, designation: 'Associate Professor' },
+      { name: 'Dr. Manoj Kumar', email: 'manoj.kumar@biharuniv.edu', department_id: 1, designation: 'Assistant Professor' },
+      { name: 'Dr. Suresh Gupta', email: 'suresh.gupta@biharuniv.edu', department_id: 2, designation: 'Associate Professor' },
+      { name: 'Dr. Ravi Kumar', email: 'ravi.kumar@biharuniv.edu', department_id: 3, designation: 'Assistant Professor' },
     ];
 
     for (const fac of faculty) {
