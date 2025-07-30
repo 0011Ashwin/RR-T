@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { TimetableModel } from '../models/Timetable.js';
+import db from '../database/index.js';
 
 const router = Router();
 
@@ -46,12 +47,55 @@ router.get('/department/:departmentId', async (req, res) => {
 // Create a new timetable
 router.post('/', async (req, res) => {
   try {
-    const timetable = req.body;
-    const newTimetable = await TimetableModel.create(timetable);
-    res.status(201).json(newTimetable);
+    const { name, department, semester, section, academicYear, sessions } = req.body;
+    
+    // First, find the department_id from department name
+    const departmentRecord = await db('departments').where({ name: department }).first();
+    let departmentId = departmentRecord?.id;
+    
+    // If department doesn't exist, create it
+    if (!departmentId) {
+      const [newDeptId] = await db('departments').insert({
+        name: department,
+        code: department.toUpperCase().replace(/\s+/g, ''),
+      });
+      departmentId = newDeptId;
+    }
+    
+    // Create the timetable with proper database schema
+    const timetableData = {
+      name,
+      semester,
+      department_id: departmentId,
+      section,
+      academic_year: academicYear,
+      is_active: true,
+    };
+    
+    const newTimetable = await TimetableModel.create(timetableData);
+    
+    // TODO: If sessions are provided, create timetable_entries
+    // For now, return the basic timetable
+    
+    res.status(201).json({
+      success: true,
+      data: {
+        id: newTimetable.id,
+        name: newTimetable.name,
+        semester: newTimetable.semester,
+        department: department,
+        section: newTimetable.section,
+        academicYear: newTimetable.academic_year,
+        isActive: newTimetable.is_active,
+        sessions: [],
+      }
+    });
   } catch (error) {
     console.error('Error creating timetable:', error);
-    res.status(500).json({ error: 'Failed to create timetable' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to create timetable' 
+    });
   }
 });
 

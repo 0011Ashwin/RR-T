@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import axios from 'axios';
 import { useHODAuth } from '@/hooks/use-hod-auth';
+import { useToast } from '@/hooks/use-toast';
 import { Routine, ClassSession, Course, Resource, DEFAULT_TIME_SLOTS } from '@shared/resource-types';
 import { exportRoutine } from '@/lib/export-utils';
+import { TimetableService } from '@/services/timetable-service';
 import { 
   Calendar,
   Download,
@@ -38,6 +39,7 @@ interface RoutineView {
 
 export default function RoutineBuilder() {
   const { currentHOD } = useHODAuth();
+  const { toast } = useToast();
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
   const [routineViews, setRoutineViews] = useState<RoutineView[]>([]);
@@ -244,52 +246,64 @@ export default function RoutineBuilder() {
     };
 
     try {
-      const response = await axios.post('/api/timetables', newTimetableData);
-
-      const createdTimetable = response.data;
-      // Convert the created timetable back to the Routine format for frontend state
-      const newRoutine: Routine = {
-        id: createdTimetable.id,
-        name: createdTimetable.name,
-        department: currentHOD?.department || 'Unknown',
-        semester: createdTimetable.semester,
-        section: createdTimetable.section,
-        academicYear: createdTimetable.academic_year,
-        sessions: createdTimetable.entries.map((entry: any) => {
-          const course = relevantCourses.find(c => c.id === entry.subject_id.toString());
-          const resource = relevantResources.find(r => r.id === entry.classroom_id.toString());
-          const faculty = { id: entry.faculty_id.toString(), name: 'Unknown Faculty' }; // You might need to fetch faculty details
-
-          return {
-            id: entry.id,
-            course: course || { id: '', name: 'Unknown Course', code: '', department: '', semester: 0, section: '', faculty: '', weeklyHours: 0, expectedSize: 0, type: 'theory', isActive: true },
-            resource: resource || { id: '', name: 'Unknown Resource', type: 'classroom', capacity: 0, department: '', location: '', facilities: [], isShared: false, isActive: true, createdAt: '', updatedAt: '' },
-            faculty: faculty,
-            day: DAYS[entry.day_of_week - 1],
-            timeSlot: `${entry.start_time} - ${entry.end_time}`,
-          };
-        }),
-        isActive: createdTimetable.is_active,
-        generatedAt: createdTimetable.created_at,
-        createdAt: createdTimetable.created_at,
-        updatedAt: createdTimetable.updated_at,
+      const newTimetableData = {
+        name: newRoutineForm.name,
+        semester: newRoutineForm.semester,
+        department: currentHOD.department,
+        section: newRoutineForm.section,
+        academicYear: newRoutineForm.academicYear,
+        sessions: [], // Start with empty sessions, can be populated later
       };
 
-      const updatedRoutines = [...routines, newRoutine];
-      setRoutines(updatedRoutines);
-      setSelectedRoutine(newRoutine);
-      updateRoutineViews(updatedRoutines);
+      const response = await TimetableService.createTimetable(newTimetableData);
+      
+      if (response.success && response.data) {
+        // Convert the created timetable to routine format
+        const newRoutine: Routine = {
+          id: response.data.id.toString(),
+          name: response.data.name,
+          department: currentHOD.department,
+          semester: response.data.semester,
+          section: response.data.section || 'A',
+          academicYear: response.data.academicYear || '2024-25',
+          sessions: [],
+          generatedBy: currentHOD.name,
+          generatedAt: new Date().toISOString(),
+          isActive: true,
+          version: 1,
+        };
 
-      setCreateDialogOpen(false);
-      setNewRoutineForm({
-        name: '',
-        semester: 1,
-        section: 'A',
-        academicYear: '2024-25',
-      });
+        const updatedRoutines = [...routines, newRoutine];
+        setRoutines(updatedRoutines);
+        setSelectedRoutine(newRoutine);
+        updateRoutineViews(updatedRoutines);
+
+        setCreateDialogOpen(false);
+        setNewRoutineForm({
+          name: '',
+          semester: 1,
+          section: 'A',
+          academicYear: '2024-25',
+        });
+
+        toast({
+          title: "Success",
+          description: "Routine created successfully!",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to create routine.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error('Error creating routine:', error);
-      alert('Failed to create routine. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to create routine. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

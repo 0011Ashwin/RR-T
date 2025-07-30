@@ -6,11 +6,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Database configuration
+// Database configuration - point to data directory
 const db = knex({
   client: 'better-sqlite3',
   connection: {
-    filename: path.join(__dirname, 'bihar_university.sqlite'),
+    filename: path.join(__dirname, '..', '..', 'data', 'bihar_university.sqlite'),
   },
   useNullAsDefault: true,
 });
