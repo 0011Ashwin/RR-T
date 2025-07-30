@@ -200,3 +200,76 @@
   color: #d97706 !important;
   font-weight: 600 !important;
 }
+
+/* Material Design 3 Theme Variables */
+@layer base {
+  [data-theme="light"] {
+    --md-sys-color-primary: #006399;
+    --md-sys-color-on-primary: #FFFFFF;
+    --md-sys-color-primary-container: #CDE5FF;
+    --md-sys-color-on-primary-container: #001D32;
+    --md-sys-color-secondary: #50606E;
+    --md-sys-color-on-secondary: #FFFFFF;
+    --md-sys-color-secondary-container: #D3E5F5;
+    --md-sys-color-on-secondary-container: #0C1D29;
+    --md-sys-color-surface: #FCFCFF;
+    --md-sys-color-surface-container-highest: #E1E2E5;
+    --md-sys-color-on-surface: #1A1C1E;
+    --md-sys-color-surface-variant: #DEE3E9;
+    --md-sys-color-on-surface-variant: #41474D;
+    --md-sys-color-outline: #72787E;
+    --md-sys-color-background: #F6F9FC;
+    --md-sys-color-on-background: #1A1C1E;
+  }
+
+  [data-theme="dark"] {
+    --md-sys-color-primary: #97CBFF;
+    --md-sys-color-on-primary: #003352;
+    --md-sys-color-primary-container: #004A74;
+    --md-sys-color-on-primary-container: #CDE5FF;
+    --md-sys-color-secondary: #B7C9D9;
+    --md-sys-color-on-secondary: #22323F;
+    --md-sys-color-secondary-container: #384956;
+    --md-sys-color-on-secondary-container: #D3E5F5;
+    --md-sys-color-surface: #121417;
+    --md-sys-color-surface-container-highest: #333538;
+    --md-sys-color-on-surface: #E2E2E5;
+    --md-sys-color-surface-variant: #41474D;
+    --md-sys-color-on-surface-variant: #C1C7CE;
+    --md-sys-color-outline: #8B9198;
+    --md-sys-color-background: #121417;
+    --md-sys-color-on-background: #E2E2E5;
+  }
+}
+
+/* Smooth transitions for theme switching */
+@layer utilities {
+  .theme-transition {
+    transition: background-color 0.5s cubic-bezier(0.4, 0.0, 0.2, 1),
+                color 0.5s cubic-bezier(0.4, 0.0, 0.2, 1),
+                border-color 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+
+  .animate-fade-in-up {
+    opacity: 0;
+    transform: translateY(30px);
+    animation: fadeInUp 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  }
+
+  @keyframes fadeInUp {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-typing-cursor {
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+}
