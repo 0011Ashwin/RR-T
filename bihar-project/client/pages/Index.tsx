@@ -250,13 +250,6 @@ export default function Index() {
         {/* LOGIN TRIGGERS */}
         <div className="flex items-center gap-3">
           <Button
-            onClick={() => navigate('/hod-login')}
-            variant="outline"
-            className="bg-white/10 text-white border-white/20 px-4 py-2 rounded-md font-semibold hover:bg-white/20"
-          >
-            HOD Portal
-          </Button>
-          <Button
             onClick={() => setLoginOpen(true)}
             className="bg-admin text-admin-foreground px-6 py-2 rounded-md font-semibold shadow-none"
           >
