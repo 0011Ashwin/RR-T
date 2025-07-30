@@ -167,6 +167,7 @@ export default function Index() {
           // HOD login through backend authentication
           console.log('Attempting HOD backend authentication');
           try {
+            console.log('Making HOD auth request...');
             const response = await fetch('/api/hod-auth/login', {
               method: 'POST',
               headers: {
@@ -178,19 +179,38 @@ export default function Index() {
               }),
             });
 
-            console.log('HOD auth response status:', response.status);
+            console.log('HOD auth response received:', {
+              status: response.status,
+              statusText: response.statusText,
+              headers: Object.fromEntries(response.headers.entries()),
+              bodyUsed: response.bodyUsed
+            });
+
+            // Clone the response so we can read it safely
+            const responseClone = response.clone();
 
             let data;
             try {
-              // Try to parse as JSON
-              data = await response.json();
+              // Try to parse as JSON from the cloned response
+              data = await responseClone.json();
               console.log('HOD auth response data:', data);
             } catch (parseError) {
               console.error('Failed to parse response as JSON:', parseError);
-              throw new Error('Invalid server response format');
+
+              // Try to get the raw text to see what the server actually returned
+              try {
+                const responseText = await response.text();
+                console.error('Raw response text:', responseText);
+                setError(`Server error: ${responseText || 'Invalid response format'}`);
+                return;
+              } catch (textError) {
+                console.error('Could not even read response as text:', textError);
+                setError('Connection error. Please check your network and try again.');
+                return;
+              }
             }
 
-            if (response.ok && data.success) {
+            if (response.ok && data && data.success) {
               // Store HOD data in localStorage
               localStorage.setItem('currentHODId', data.hod.id.toString());
               localStorage.setItem('userRole', 'hod');
@@ -199,17 +219,11 @@ export default function Index() {
               setLoginOpen(false);
               navigate('/department');
             } else {
-              setError(data.error || 'Invalid HOD credentials. Please check your email and password.');
+              setError(data?.error || 'Invalid HOD credentials. Please check your email and password.');
             }
           } catch (authError) {
             console.error('HOD auth error:', authError);
-            if (authError.message.includes('stream')) {
-              setError('Connection error. Please try again.');
-            } else if (authError.message.includes('JSON')) {
-              setError('Server error. Please try again later.');
-            } else {
-              setError('Failed to authenticate HOD. Please try again.');
-            }
+            setError('Network error. Please check your connection and try again.');
           }
         } else {
           // Handle VC and Principal login with static accounts
