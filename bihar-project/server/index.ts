@@ -62,6 +62,7 @@ export async function createServer() {
   app.post("/api/chat", handleChat);
 
   // API routes for database entities
+  app.use("/api/colleges", collegeRouter);
   app.use("/api/departments", departmentRouter);
   app.use("/api/classrooms", classroomRouter);
   app.use("/api/faculty", facultyRouter);
