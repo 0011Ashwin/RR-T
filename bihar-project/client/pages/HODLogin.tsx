@@ -30,6 +30,8 @@ export default function HODLogin() {
     }
 
     try {
+      console.log('Attempting login with:', { email, passwordLength: password.length });
+
       // Use backend authentication
       const response = await fetch('/api/hod-auth/login', {
         method: 'POST',
@@ -39,14 +41,19 @@ export default function HODLogin() {
         body: JSON.stringify({ email, password }),
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
       // Check if the response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
+        console.error('Non-JSON response received:', contentType);
         throw new Error('Server returned non-JSON response');
       }
 
       // Read the response once and handle both success and error cases
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (response.ok && data.success) {
         // Store HOD data in localStorage to work with existing useHODAuth hook
