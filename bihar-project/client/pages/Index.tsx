@@ -143,38 +143,113 @@ export default function Index() {
 
   // LOGIN HANDLER: Process authentication and route to appropriate dashboard
   // Sets localStorage for session management and navigates based on role
-  const handleLogin = () => {
-    if (activeRole === "student") {
-      // STUDENT LOGIN: Any credentials accepted for demo purposes
-      if (credentials.email && credentials.password) {
+  const handleLogin = async () => {
+    if (!credentials.email || !credentials.password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (activeRole === "student") {
+        // STUDENT LOGIN: Any credentials accepted for demo purposes
         localStorage.setItem("userRole", "student");
         localStorage.setItem("userEmail", credentials.email);
+        toast.success('Login successful!');
+        setLoginOpen(false);
         navigate("/student"); // → StudentDashboard.tsx
-      }
-    } else if (activeRole === "admin") {
-      // ADMIN LOGIN: Check against predefined admin accounts
-      if (credentials.email && credentials.password) {
-        const adminType = adminAccounts[credentials.email.toLowerCase()];
-        if (adminType) {
-          localStorage.setItem("userRole", "admin");
-          localStorage.setItem("adminType", adminType);
-          localStorage.setItem("userEmail", credentials.email);
-          // ROLE-BASED ROUTING: Navigate to appropriate dashboard
-          switch (adminType) {
-            case "vc":
-              navigate("/university"); // → UniversityDashboard.tsx
-              break;
-            case "principal":
-              navigate("/principal"); // → CollegeDashboard.tsx
-              break;
-            case "hod":
-              navigate("/department"); // → HODDashboard.tsx
-              break;
+      } else if (activeRole === "admin") {
+        console.log('Admin login attempt:', { adminSubRole, email: credentials.email });
+
+        if (adminSubRole === 'hod') {
+          // HOD login through backend authentication
+          console.log('Attempting HOD backend authentication');
+          try {
+            const response = await fetch('/api/hod-auth/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: credentials.email,
+                password: credentials.password
+              }),
+            });
+
+            console.log('HOD auth response status:', response.status);
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              throw new Error('Server returned non-JSON response');
+            }
+
+            const data = await response.json();
+            console.log('HOD auth response data:', data);
+
+            if (response.ok && data.success) {
+              // Store HOD data in localStorage
+              localStorage.setItem('currentHODId', data.hod.id.toString());
+              localStorage.setItem('userRole', 'hod');
+              localStorage.setItem('userEmail', credentials.email);
+              toast.success('HOD login successful!');
+              setLoginOpen(false);
+              navigate('/department');
+            } else {
+              setError(data.error || 'Invalid HOD credentials. Please check your email and password.');
+            }
+          } catch (authError) {
+            console.error('HOD auth error:', authError);
+            setError('Failed to authenticate HOD. Please try again.');
           }
         } else {
-          // Optionally show error: not a recognized admin
+          // Handle VC and Principal login with static accounts
+          if (adminSubRole === 'vc' && credentials.email.toLowerCase() === 'vc@example.com') {
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('adminType', 'vc');
+            localStorage.setItem('userEmail', credentials.email);
+            toast.success('VC login successful!');
+            setLoginOpen(false);
+            navigate('/university');
+          } else if (adminSubRole === 'principal' && credentials.email.toLowerCase() === 'principal@example.com') {
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('adminType', 'principal');
+            localStorage.setItem('userEmail', credentials.email);
+            toast.success('Principal login successful!');
+            setLoginOpen(false);
+            navigate('/principal');
+          } else {
+            // Check if it's one of the predefined admin accounts
+            const predefinedAdminType = adminAccounts[credentials.email.toLowerCase()];
+            if (predefinedAdminType) {
+              localStorage.setItem('userRole', 'admin');
+              localStorage.setItem('adminType', predefinedAdminType);
+              localStorage.setItem('userEmail', credentials.email);
+              toast.success('Login successful!');
+              setLoginOpen(false);
+              switch (predefinedAdminType) {
+                case 'vc':
+                  navigate('/university');
+                  break;
+                case 'principal':
+                  navigate('/principal');
+                  break;
+                case 'hod':
+                  navigate('/department');
+                  break;
+              }
+            } else {
+              setError(`Invalid ${adminSubRole.toUpperCase()} credentials. Please check your email and password.`);
+            }
+          }
         }
       }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Login failed. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
