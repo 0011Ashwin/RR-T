@@ -7,6 +7,13 @@ export async function seedDatabase() {
   try {
     console.log('Starting database seeding...');
 
+    // Check if colleges already exist
+    const existingColleges = await CollegeModel.getAll();
+    if (existingColleges.length > 0) {
+      console.log('Database already seeded. Skipping seeding.');
+      return;
+    }
+
     // Create sample colleges
     const college1 = await CollegeModel.create({
       name: 'Bihar Engineering College',
