@@ -24,20 +24,32 @@ export default function Login() {
     'hod@example.com': 'hod',
   };
 
-  const handleLogin = () => {
-    if (activeRole === 'student') {
-      if (credentials.email && credentials.password) {
+  const handleLogin = async () => {
+    if (!credentials.email || !credentials.password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (activeRole === 'student') {
+        // Student login logic
         localStorage.setItem('userRole', 'student');
         localStorage.setItem('userEmail', credentials.email);
+        toast.success('Login successful!');
         navigate('/student');
-      }
-    } else if (activeRole === 'admin') {
-      if (credentials.email && credentials.password) {
+      } else if (activeRole === 'admin') {
+        // Check if it's a static admin account first
         const adminType = adminAccounts[credentials.email.toLowerCase()];
-        if (adminType) {
+
+        if (adminType && adminType !== 'hod') {
+          // Handle VC and Principal login (existing logic)
           localStorage.setItem('userRole', 'admin');
           localStorage.setItem('adminType', adminType);
           localStorage.setItem('userEmail', credentials.email);
+          toast.success('Login successful!');
           switch (adminType) {
             case 'vc':
               navigate('/university');
@@ -45,14 +57,55 @@ export default function Login() {
             case 'principal':
               navigate('/principal');
               break;
-            case 'hod':
-              navigate('/department');
-              break;
+          }
+        } else if (adminSubRole === 'hod') {
+          // HOD login through backend authentication
+          const response = await fetch('/api/hod-auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password
+            }),
+          });
+
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Server returned non-JSON response');
+          }
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            // Store HOD data in localStorage
+            localStorage.setItem('currentHODId', data.hod.id.toString());
+            localStorage.setItem('userRole', 'hod');
+            localStorage.setItem('userEmail', credentials.email);
+            toast.success('HOD login successful!');
+            navigate('/department');
+          } else {
+            setError(data.error || 'Invalid HOD credentials. Please check your email and password.');
           }
         } else {
-          // Optionally show error: not a recognized admin
+          // Check if it's the generic hod@example.com account
+          if (credentials.email.toLowerCase() === 'hod@example.com') {
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('adminType', 'hod');
+            localStorage.setItem('userEmail', credentials.email);
+            toast.success('Login successful!');
+            navigate('/department');
+          } else {
+            setError('Invalid admin credentials.');
+          }
         }
       }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Login failed. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
