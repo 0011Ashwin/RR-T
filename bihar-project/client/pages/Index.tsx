@@ -180,11 +180,15 @@ export default function Index() {
 
             console.log('HOD auth response status:', response.status);
 
+            // Check content type before reading the body
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
+              const errorText = await response.text();
+              console.error('Non-JSON response received:', errorText);
               throw new Error('Server returned non-JSON response');
             }
 
+            // Read the response body only once
             const data = await response.json();
             console.log('HOD auth response data:', data);
 
