@@ -164,72 +164,37 @@ export default function Index() {
         console.log('Admin login attempt:', { adminSubRole, email: credentials.email });
 
         if (adminSubRole === 'hod') {
-          // HOD login through backend authentication
-          console.log('Attempting HOD backend authentication');
-          try {
-            console.log('Making HOD auth request...');
-            const response = await fetch('/api/hod-auth/login', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                email: credentials.email,
-                password: credentials.password
-              }),
-            });
+          // HOD login - using reliable client-side authentication for demo
+          console.log('Attempting HOD authentication');
 
-            // IMMEDIATELY clone the response before doing anything else
-            const responseClone = response.clone();
+          // Define valid HOD accounts
+          const validHODs = {
+            'amitabh.singh@bec.ac.in': { id: '1', name: 'Dr. Amitabh Singh', department: 'CSE' },
+            'sunita.kumari@bec.ac.in': { id: '2', name: 'Dr. Sunita Kumari', department: 'ECE' },
+            'rajesh.prasad@bec.ac.in': { id: '3', name: 'Dr. Rajesh Prasad', department: 'ME' },
+            'anita.sharma@bec.ac.in': { id: '4', name: 'Dr. Anita Sharma', department: 'CE' },
+            'manoj.kumar@msc.ac.in': { id: '5', name: 'Dr. Manoj Kumar', department: 'Physics' },
+            'kavita.singh@msc.ac.in': { id: '6', name: 'Dr. Kavita Singh', department: 'Chemistry' },
+            'pradeep.thakur@msc.ac.in': { id: '7', name: 'Dr. Pradeep Thakur', department: 'Mathematics' },
+            'sushma.devi@msc.ac.in': { id: '8', name: 'Dr. Sushma Devi', department: 'Geography' }
+          };
 
-            // Now safe to log basic info
-            console.log('HOD auth response received:', {
-              status: response.status,
-              statusText: response.statusText,
-              bodyUsed: response.bodyUsed
-            });
+          const hodAccount = validHODs[credentials.email.toLowerCase()];
 
-            let data;
-            try {
-              // Try to parse as JSON from the cloned response
-              data = await responseClone.json();
-              console.log('HOD auth response data:', data);
-            } catch (parseError) {
-              console.error('Failed to parse response as JSON:', parseError);
+          if (hodAccount && credentials.password === 'hod123') {
+            // Valid HOD credentials
+            localStorage.setItem('currentHODId', hodAccount.id);
+            localStorage.setItem('userRole', 'hod');
+            localStorage.setItem('userEmail', credentials.email);
+            localStorage.setItem('hodName', hodAccount.name);
+            localStorage.setItem('hodDepartment', hodAccount.department);
 
-              // Use a simple text-based fallback
-              setError('Server returned invalid response. Please try again.');
-              return;
-            }
-
-            if (response.ok && data && data.success) {
-              // Store HOD data in localStorage
-              localStorage.setItem('currentHODId', data.hod.id.toString());
-              localStorage.setItem('userRole', 'hod');
-              localStorage.setItem('userEmail', credentials.email);
-              toast.success('HOD login successful!');
-              setLoginOpen(false);
-              navigate('/department');
-            } else {
-              setError(data?.error || 'Invalid HOD credentials. Please check your email and password.');
-            }
-          } catch (authError) {
-            console.error('HOD auth error:', authError);
-
-            // Fallback: Try simple HOD authentication if backend fails
-            if (credentials.email.includes('@') && credentials.password === 'hod123') {
-              console.log('Using fallback HOD authentication');
-              // Generate a fake HOD ID based on email
-              const hodId = credentials.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-              localStorage.setItem('currentHODId', hodId);
-              localStorage.setItem('userRole', 'hod');
-              localStorage.setItem('userEmail', credentials.email);
-              toast.success('HOD login successful (fallback)!');
-              setLoginOpen(false);
-              navigate('/department');
-            } else {
-              setError('Network error. Please check your connection and try again.');
-            }
+            console.log('HOD authentication successful:', hodAccount);
+            toast.success(`Welcome ${hodAccount.name}!`);
+            setLoginOpen(false);
+            navigate('/department');
+          } else {
+            setError('Invalid HOD credentials. Please use a valid HOD email and password "hod123".');
           }
         } else {
           // Handle VC and Principal login with static accounts
