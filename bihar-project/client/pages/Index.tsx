@@ -192,13 +192,7 @@ export default function Index() {
             console.log('HOD authentication successful:', hodAccount);
             toast.success(`Welcome ${hodAccount.name}!`);
             setLoginOpen(false);
-
-            // Force navigation and refresh to ensure auth hooks update
-            setTimeout(() => {
-              navigate('/department');
-              // Force a page refresh to ensure the auth context updates
-              window.location.reload();
-            }, 500);
+            navigate('/department');
           } else {
             setError('Invalid HOD credentials. Please use a valid HOD email and password "hod123".');
           }
