@@ -10,7 +10,7 @@ import UniversityDashboard from "./pages/UniversityDashboard";
 import CollegeDashboard from "./pages/CollegeDashboard";
 import StudentDashboard from "./pages/EnhancedStudentDashboard";
 import HODDashboard from "./pages/HODDashboard";
-import HODLogin from "./pages/HODLogin";
+
 import Resources from "./pages/Resources";
 import RoutineBuilder from "./pages/RoutineBuilder";
 import ResourceManagement from "./pages/ResourceManagement";
