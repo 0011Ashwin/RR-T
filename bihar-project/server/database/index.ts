@@ -99,7 +99,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[2]) {
+  if (!tablesExist[4]) {
     await db.schema.createTable('faculty', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
