@@ -10,7 +10,7 @@ import UniversityDashboard from "./pages/UniversityDashboard";
 import CollegeDashboard from "./pages/CollegeDashboard";
 import StudentDashboard from "./pages/EnhancedStudentDashboard";
 import HODDashboard from "./pages/HODDashboard";
-import HODLogin from "./pages/HODLogin";
+
 import Resources from "./pages/Resources";
 import RoutineBuilder from "./pages/RoutineBuilder";
 import ResourceManagement from "./pages/ResourceManagement";
@@ -34,7 +34,7 @@ const App = () => (
             <Route path="/university" element={<UniversityDashboard />} />
             <Route path="/principal" element={<CollegeDashboard />} />
             <Route path="/department" element={<HODDashboard />} />
-            <Route path="/hod-login" element={<HODLogin />} />
+
             <Route path="/resources" element={<Resources />} />
             <Route path="/routine-builder" element={<RoutineBuilder />} />
             <Route path="/resource-management" element={<ResourceManagement />} />

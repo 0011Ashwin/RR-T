@@ -15,6 +15,10 @@ import { adminRouter } from "./routes/admin.js";
 import { bookingRequestRouter } from "./routes/booking-request.js";
 import { classSessionRouter } from "./routes/class-session.js";
 import { timeslotRouter } from "./routes/timeslot.js";
+import { hodAuthRouter } from "./routes/hod-auth.js";
+import { resourceRequestRouter } from "./routes/resource-request.js";
+import { collegeRouter } from "./routes/college.js";
+import { seedDatabase } from "./database/seed.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -41,6 +45,10 @@ export async function createServer() {
   try {
     await initializeDatabase();
     console.log('Database initialized successfully');
+
+    // Seed database with sample data (only on first run)
+    await seedDatabase();
+
   } catch (error) {
     console.error('Error initializing database:', error);
   }
@@ -54,6 +62,7 @@ export async function createServer() {
   app.post("/api/chat", handleChat);
 
   // API routes for database entities
+  app.use("/api/colleges", collegeRouter);
   app.use("/api/departments", departmentRouter);
   app.use("/api/classrooms", classroomRouter);
   app.use("/api/faculty", facultyRouter);
@@ -65,6 +74,8 @@ export async function createServer() {
   app.use("/api/admin", adminRouter);
   app.use("/api/class-sessions", classSessionRouter);
   app.use("/api/timeslots", timeslotRouter);
+  app.use("/api/hod-auth", hodAuthRouter);
+  app.use("/api/resource-requests", resourceRequestRouter);
 
   return app;
 }

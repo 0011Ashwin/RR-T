@@ -24,12 +24,72 @@ export const HODAuthProvider: React.FC<HODAuthProviderProps> = ({ children }) =>
   useEffect(() => {
     const savedHODId = localStorage.getItem('currentHODId');
     if (savedHODId) {
-      const hod = allHODs.find(h => h.id === savedHODId);
+      fetchHODData(savedHODId);
+    }
+  }, []);
+
+  const fetchHODData = async (hodId: string) => {
+    try {
+      // First check if we have client-side HOD data
+      const hodName = localStorage.getItem('hodName');
+      const hodDepartment = localStorage.getItem('hodDepartment');
+      const userEmail = localStorage.getItem('userEmail');
+
+      if (hodName && hodDepartment && userEmail) {
+        // Use client-side data
+        const clientSideHOD = {
+          id: hodId,
+          name: hodName,
+          email: userEmail,
+          designation: 'Head of Department',
+          department: hodDepartment,
+          employeeId: `HOD-${hodId}`,
+          joinDate: '2020-01-01',
+          experience: '10+ years',
+          avatar: null,
+          isActive: true,
+          phone: '+91-9876543210'
+        };
+        console.log('Using client-side HOD data:', clientSideHOD);
+        setCurrentHOD(clientSideHOD);
+        return;
+      }
+
+      // Fallback to backend API
+      const response = await fetch(`/api/hod-auth/profile/${hodId}`);
+      if (response.ok) {
+        const hodData = await response.json();
+        // Convert backend format to frontend format
+        const frontendHOD = {
+          id: hodData.id.toString(),
+          name: hodData.name,
+          email: hodData.email,
+          designation: hodData.designation,
+          department: hodData.department_name || 'Unknown Department',
+          employeeId: hodData.employee_id,
+          joinDate: hodData.join_date,
+          experience: hodData.experience,
+          avatar: hodData.avatar,
+          isActive: hodData.is_active,
+          phone: hodData.phone
+        };
+        setCurrentHOD(frontendHOD);
+      } else {
+        // If fetch fails, try to find in sample data
+        const hod = allHODs.find(h => h.id === hodId);
+        if (hod) {
+          setCurrentHOD(hod);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching HOD data:', error);
+      // Fallback to sample data
+      const hod = allHODs.find(h => h.id === hodId);
       if (hod) {
         setCurrentHOD(hod);
       }
     }
-  }, [allHODs]);
+  };
 
   const login = async (email: string): Promise<boolean> => {
     const hod = allHODs.find(h => h.email === email && h.isActive);
