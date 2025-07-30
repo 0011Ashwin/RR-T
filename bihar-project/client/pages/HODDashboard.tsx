@@ -59,7 +59,7 @@ export default function HODDashboard() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/hod-login');
+      navigate('/');
     }
   }, [isAuthenticated, navigate]);
 
