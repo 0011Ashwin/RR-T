@@ -60,13 +60,28 @@ export default function HODLogin() {
 
   const handleQuickLogin = async (hodEmail: string) => {
     setEmail(hodEmail);
+    setPassword('hod123'); // Default password for demo
     setIsLoading(true);
     setError('');
 
     try {
-      const success = await login(hodEmail);
-      if (success) {
+      const response = await fetch('/api/hod-auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: hodEmail, password: 'hod123' }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('currentHODId', data.hod.id.toString());
+        localStorage.setItem('userRole', 'hod');
+        toast.success('Login successful!');
         navigate('/department');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Login failed.');
       }
     } catch (err) {
       setError('Login failed. Please try again.');
