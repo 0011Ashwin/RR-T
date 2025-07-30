@@ -34,12 +34,50 @@ export async function initializeDatabase() {
   ]);
 
   if (!tablesExist[0]) {
+    await db.schema.createTable('colleges', (table) => {
+      table.increments('id').primary();
+      table.string('name').notNullable();
+      table.string('code').notNullable().unique();
+      table.string('address');
+      table.string('principal_name');
+      table.string('principal_email');
+      table.string('phone');
+      table.integer('university_id').unsigned();
+      table.boolean('is_active').defaultTo(true);
+      table.timestamps(true, true);
+    });
+  }
+
+  if (!tablesExist[1]) {
     await db.schema.createTable('departments', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
       table.string('code').notNullable().unique();
       table.string('hod_name');
       table.string('hod_email');
+      table.integer('college_id').unsigned();
+      table.foreign('college_id').references('colleges.id');
+      table.timestamps(true, true);
+    });
+  }
+
+  if (!tablesExist[2]) {
+    await db.schema.createTable('hods', (table) => {
+      table.increments('id').primary();
+      table.string('name').notNullable();
+      table.string('email').notNullable().unique();
+      table.string('password').notNullable();
+      table.string('designation').notNullable();
+      table.string('employee_id').notNullable().unique();
+      table.string('phone');
+      table.integer('department_id').unsigned().notNullable();
+      table.foreign('department_id').references('departments.id');
+      table.integer('college_id').unsigned();
+      table.foreign('college_id').references('colleges.id');
+      table.string('join_date').notNullable();
+      table.string('experience');
+      table.string('avatar');
+      table.boolean('is_active').defaultTo(true);
       table.timestamps(true, true);
     });
   }
