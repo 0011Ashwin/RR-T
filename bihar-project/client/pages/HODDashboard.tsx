@@ -676,6 +676,11 @@ export default function HODDashboard() {
             <BookingRequests />
           </TabsContent>
 
+          {/* Resource Requests Tab */}
+          <TabsContent value="resource-requests" className="space-y-6">
+            <ResourceRequestManagement />
+          </TabsContent>
+
           {/* Faculty Tab */}
           <TabsContent value="faculty" className="space-y-6">
             <Card>
