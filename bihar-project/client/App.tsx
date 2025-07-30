@@ -45,6 +45,7 @@ const App = () => (
             <Route path="/college/:collegeName" element={<CollegeDetails />} />
             <Route path="/staff/teaching" element={<TeachingStaff />} />
             <Route path="/staff/non-teaching" element={<NonTeachingStaff />} />
+            <Route path="/hod-test" element={<HODTest />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
