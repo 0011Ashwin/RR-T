@@ -84,10 +84,16 @@ export default function HODLogin() {
         body: JSON.stringify({ email: hodEmail, password: 'hod123' }),
       });
 
-      // Read the response once
+      // Check if the response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned non-JSON response');
+      }
+
+      // Read the response once and handle both success and error cases
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         localStorage.setItem('currentHODId', data.hod.id.toString());
         localStorage.setItem('userRole', 'hod');
         toast.success('Login successful!');
@@ -96,7 +102,12 @@ export default function HODLogin() {
         setError(data.error || 'Login failed.');
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      if (err instanceof TypeError && err.message.includes('stream')) {
+        setError('Connection error. Please try again.');
+      } else {
+        setError('Login failed. Please check your connection and try again.');
+      }
+      console.error('Quick login error:', err);
     } finally {
       setIsLoading(false);
     }
