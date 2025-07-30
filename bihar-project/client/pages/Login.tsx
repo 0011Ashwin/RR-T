@@ -41,63 +41,85 @@ export default function Login() {
         toast.success('Login successful!');
         navigate('/student');
       } else if (activeRole === 'admin') {
-        // Check if it's a static admin account first
-        const adminType = adminAccounts[credentials.email.toLowerCase()];
+        console.log('Admin login attempt:', { adminSubRole, email: credentials.email });
 
-        if (adminType && adminType !== 'hod') {
-          // Handle VC and Principal login (existing logic)
-          localStorage.setItem('userRole', 'admin');
-          localStorage.setItem('adminType', adminType);
-          localStorage.setItem('userEmail', credentials.email);
-          toast.success('Login successful!');
-          switch (adminType) {
-            case 'vc':
-              navigate('/university');
-              break;
-            case 'principal':
-              navigate('/principal');
-              break;
-          }
-        } else if (adminSubRole === 'hod') {
+        if (adminSubRole === 'hod') {
           // HOD login through backend authentication
-          const response = await fetch('/api/hod-auth/login', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email: credentials.email,
-              password: credentials.password
-            }),
-          });
+          console.log('Attempting HOD backend authentication');
+          try {
+            const response = await fetch('/api/hod-auth/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: credentials.email,
+                password: credentials.password
+              }),
+            });
 
-          const contentType = response.headers.get('content-type');
-          if (!contentType || !contentType.includes('application/json')) {
-            throw new Error('Server returned non-JSON response');
-          }
+            console.log('HOD auth response status:', response.status);
 
-          const data = await response.json();
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              throw new Error('Server returned non-JSON response');
+            }
 
-          if (response.ok && data.success) {
-            // Store HOD data in localStorage
-            localStorage.setItem('currentHODId', data.hod.id.toString());
-            localStorage.setItem('userRole', 'hod');
-            localStorage.setItem('userEmail', credentials.email);
-            toast.success('HOD login successful!');
-            navigate('/department');
-          } else {
-            setError(data.error || 'Invalid HOD credentials. Please check your email and password.');
+            const data = await response.json();
+            console.log('HOD auth response data:', data);
+
+            if (response.ok && data.success) {
+              // Store HOD data in localStorage
+              localStorage.setItem('currentHODId', data.hod.id.toString());
+              localStorage.setItem('userRole', 'hod');
+              localStorage.setItem('userEmail', credentials.email);
+              toast.success('HOD login successful!');
+              navigate('/department');
+            } else {
+              setError(data.error || 'Invalid HOD credentials. Please check your email and password.');
+            }
+          } catch (authError) {
+            console.error('HOD auth error:', authError);
+            setError('Failed to authenticate HOD. Please try again.');
           }
         } else {
-          // Check if it's the generic hod@example.com account
-          if (credentials.email.toLowerCase() === 'hod@example.com') {
+          // Handle VC and Principal login with static accounts
+          const adminType = adminSubRole; // Use the selected admin sub role
+
+          if (adminSubRole === 'vc' && credentials.email.toLowerCase() === 'vc@example.com') {
             localStorage.setItem('userRole', 'admin');
-            localStorage.setItem('adminType', 'hod');
+            localStorage.setItem('adminType', 'vc');
             localStorage.setItem('userEmail', credentials.email);
-            toast.success('Login successful!');
-            navigate('/department');
+            toast.success('VC login successful!');
+            navigate('/university');
+          } else if (adminSubRole === 'principal' && credentials.email.toLowerCase() === 'principal@example.com') {
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('adminType', 'principal');
+            localStorage.setItem('userEmail', credentials.email);
+            toast.success('Principal login successful!');
+            navigate('/principal');
           } else {
-            setError('Invalid admin credentials.');
+            // Check if it's one of the predefined admin accounts
+            const predefinedAdminType = adminAccounts[credentials.email.toLowerCase()];
+            if (predefinedAdminType) {
+              localStorage.setItem('userRole', 'admin');
+              localStorage.setItem('adminType', predefinedAdminType);
+              localStorage.setItem('userEmail', credentials.email);
+              toast.success('Login successful!');
+              switch (predefinedAdminType) {
+                case 'vc':
+                  navigate('/university');
+                  break;
+                case 'principal':
+                  navigate('/principal');
+                  break;
+                case 'hod':
+                  navigate('/department');
+                  break;
+              }
+            } else {
+              setError(`Invalid ${adminSubRole.toUpperCase()} credentials. Please check your email and password.`);
+            }
           }
         }
       }
