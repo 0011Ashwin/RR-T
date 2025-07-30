@@ -67,6 +67,8 @@ export async function createServer() {
   app.use("/api/admin", adminRouter);
   app.use("/api/class-sessions", classSessionRouter);
   app.use("/api/timeslots", timeslotRouter);
+  app.use("/api/hod-auth", hodAuthRouter);
+  app.use("/api/resource-requests", resourceRequestRouter);
 
   return app;
 }
