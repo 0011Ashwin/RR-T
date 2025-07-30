@@ -15,6 +15,8 @@ import { adminRouter } from "./routes/admin.js";
 import { bookingRequestRouter } from "./routes/booking-request.js";
 import { classSessionRouter } from "./routes/class-session.js";
 import { timeslotRouter } from "./routes/timeslot.js";
+import { hodAuthRouter } from "./routes/hod-auth.js";
+import { resourceRequestRouter } from "./routes/resource-request.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
