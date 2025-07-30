@@ -15,6 +15,8 @@ export default function Login() {
   const [activeRole, setActiveRole] = useState<'student' | 'admin'>('student');
   const [adminSubRole, setAdminSubRole] = useState<'vc' | 'principal' | 'hod'>('vc');
   const [credentials, setCredentials] = useState({ email: '', password: '' });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const adminAccounts = {
     'vc@example.com': 'vc',
