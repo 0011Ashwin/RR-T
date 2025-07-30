@@ -179,15 +179,15 @@ export default function Index() {
               }),
             });
 
+            // IMMEDIATELY clone the response before doing anything else
+            const responseClone = response.clone();
+
+            // Now safe to log basic info
             console.log('HOD auth response received:', {
               status: response.status,
               statusText: response.statusText,
-              headers: Object.fromEntries(response.headers.entries()),
               bodyUsed: response.bodyUsed
             });
-
-            // Clone the response so we can read it safely
-            const responseClone = response.clone();
 
             let data;
             try {
@@ -197,17 +197,9 @@ export default function Index() {
             } catch (parseError) {
               console.error('Failed to parse response as JSON:', parseError);
 
-              // Try to get the raw text to see what the server actually returned
-              try {
-                const responseText = await response.text();
-                console.error('Raw response text:', responseText);
-                setError(`Server error: ${responseText || 'Invalid response format'}`);
-                return;
-              } catch (textError) {
-                console.error('Could not even read response as text:', textError);
-                setError('Connection error. Please check your network and try again.');
-                return;
-              }
+              // Use a simple text-based fallback
+              setError('Server returned invalid response. Please try again.');
+              return;
             }
 
             if (response.ok && data && data.success) {
