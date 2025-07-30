@@ -82,7 +82,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[1]) {
+  if (!tablesExist[3]) {
     await db.schema.createTable('classrooms', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
