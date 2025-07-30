@@ -222,7 +222,13 @@ export default function Login() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="admin-type">Admin Type</Label>
-                  <Select value={adminSubRole} onValueChange={(value: 'vc' | 'principal' | 'hod') => setAdminSubRole(value)}>
+                  <Select
+                    value={adminSubRole}
+                    onValueChange={(value: 'vc' | 'principal' | 'hod') => {
+                      console.log('Admin type changed to:', value);
+                      setAdminSubRole(value);
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select admin type" />
                     </SelectTrigger>
@@ -232,6 +238,9 @@ export default function Login() {
                       <SelectItem value="hod">Head of Department (HOD)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <div className="text-xs text-gray-500">
+                    Current selection: {adminSubRole}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="admin-email">
