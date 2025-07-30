@@ -659,7 +659,7 @@ export default function HODDashboard() {
 
           {/* Resources Tab */}
           <TabsContent value="resources" className="space-y-6">
-            <Resources />
+            <EnhancedResources />
           </TabsContent>
 
           {/* Routine Builder Tab */}
@@ -679,7 +679,7 @@ export default function HODDashboard() {
 
           {/* Resource Requests Tab */}
           <TabsContent value="resource-requests" className="space-y-6">
-            <ResourceRequestManagement />
+            <EnhancedResourceRequestManagement />
           </TabsContent>
 
           {/* Faculty Tab */}
