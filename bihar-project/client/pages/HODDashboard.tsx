@@ -529,6 +529,13 @@ export default function HODDashboard() {
               Requests
             </TabsTrigger>
             <TabsTrigger
+              value="resource-requests"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Inter-Dept
+            </TabsTrigger>
+            <TabsTrigger
               value="faculty"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
             >
