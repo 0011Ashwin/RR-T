@@ -79,6 +79,64 @@ export default function Resources() {
 
   const [conflicts, setConflicts] = useState<string[]>([]);
 
+  // Manual refresh function to force slot occupancy update
+  const refreshSlotOccupancy = () => {
+    console.log('Manual refresh triggered - forcing slot occupancy update');
+    if (weeklySlots.length > 0) {
+      setWeeklySlots(prev => prev.map(slot => {
+        // Check for class session
+        const session = classSessions.find(s =>
+          s.resourceId === slot.resourceId &&
+          s.timeSlotId === slot.timeSlotId &&
+          s.dayOfWeek === slot.dayOfWeek
+        );
+
+        if (session) {
+          return {
+            ...slot,
+            isOccupied: true,
+            occupiedBy: {
+              courseId: session.courseId,
+              courseName: `Course ${session.courseId}`,
+              department: currentHOD?.department || '',
+              faculty: session.faculty,
+              classSize: 0,
+            }
+          };
+        }
+
+        // Check for approved booking request
+        const booking = bookingRequests.find(b => {
+          const mappedTimeSlotId = mapTimeSlotId(b.timeSlotId);
+          return String(b.targetResourceId) === String(slot.resourceId) &&
+                 String(mappedTimeSlotId) === String(slot.timeSlotId) &&
+                 b.dayOfWeek === slot.dayOfWeek &&
+                 b.status === 'approved';
+        });
+
+        if (booking) {
+          return {
+            ...slot,
+            isOccupied: true,
+            occupiedBy: {
+              courseId: '',
+              courseName: booking.purpose || booking.courseName,
+              department: booking.requesterDepartment,
+              faculty: 'External Booking',
+              classSize: booking.expectedAttendance || 0,
+            }
+          };
+        }
+
+        return {
+          ...slot,
+          isOccupied: false,
+          occupiedBy: undefined,
+        };
+      }));
+    }
+  };
+
   // Load resources and data from database
   useEffect(() => {
     const loadData = async () => {
@@ -139,6 +197,27 @@ export default function Resources() {
 
     loadData();
   }, [currentHOD, toast]);
+
+  // Force refresh when component becomes visible (tab switch)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && weeklySlots.length > 0) {
+        console.log('Tab became visible - refreshing slot occupancy');
+        setTimeout(() => refreshSlotOccupancy(), 100);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also trigger refresh when component mounts with existing data
+    if (weeklySlots.length > 0) {
+      setTimeout(() => refreshSlotOccupancy(), 300);
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [weeklySlots.length, classSessions.length, bookingRequests.length]);
 
   // Generate weekly time slots for resources
   const generateWeeklySlots = (allResources: Resource[]) => {
@@ -442,6 +521,14 @@ export default function Resources() {
             className={showUnavailableSlots ? "bg-orange-600 hover:bg-orange-700" : "border-orange-300 text-orange-700 hover:bg-orange-50"}
           >
             {showUnavailableSlots ? "Hide" : "Show"} Unavailable Slots
+          </Button>
+          <Button 
+            onClick={refreshSlotOccupancy}
+            variant="outline"
+            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            <Wand2 className="h-4 w-4 mr-2" />
+            Refresh Slots
           </Button>
         </div>
       </div>
