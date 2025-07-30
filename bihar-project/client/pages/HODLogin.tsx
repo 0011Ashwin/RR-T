@@ -39,16 +39,17 @@ export default function HODLogin() {
         body: JSON.stringify({ email, password }),
       });
 
+      // Read the response once
+      const data = await response.json();
+
       if (response.ok) {
-        const data = await response.json();
         // Store HOD data in localStorage to work with existing useHODAuth hook
         localStorage.setItem('currentHODId', data.hod.id.toString());
         localStorage.setItem('userRole', 'hod');
         toast.success('Login successful!');
         navigate('/department');
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Login failed. Please check your credentials.');
+        setError(data.error || 'Login failed. Please check your credentials.');
       }
     } catch (err) {
       setError('Login failed. Please try again.');
