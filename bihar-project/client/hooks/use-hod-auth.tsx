@@ -30,6 +30,32 @@ export const HODAuthProvider: React.FC<HODAuthProviderProps> = ({ children }) =>
 
   const fetchHODData = async (hodId: string) => {
     try {
+      // First check if we have client-side HOD data
+      const hodName = localStorage.getItem('hodName');
+      const hodDepartment = localStorage.getItem('hodDepartment');
+      const userEmail = localStorage.getItem('userEmail');
+
+      if (hodName && hodDepartment && userEmail) {
+        // Use client-side data
+        const clientSideHOD = {
+          id: hodId,
+          name: hodName,
+          email: userEmail,
+          designation: 'Head of Department',
+          department: hodDepartment,
+          employeeId: `HOD-${hodId}`,
+          joinDate: '2020-01-01',
+          experience: '10+ years',
+          avatar: null,
+          isActive: true,
+          phone: '+91-9876543210'
+        };
+        console.log('Using client-side HOD data:', clientSideHOD);
+        setCurrentHOD(clientSideHOD);
+        return;
+      }
+
+      // Fallback to backend API
       const response = await fetch(`/api/hod-auth/profile/${hodId}`);
       if (response.ok) {
         const hodData = await response.json();
