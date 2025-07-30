@@ -19,7 +19,9 @@ const db = knex({
 export async function initializeDatabase() {
   // Create tables if they don't exist
   const tablesExist = await Promise.all([
+    db.schema.hasTable('colleges'),
     db.schema.hasTable('departments'),
+    db.schema.hasTable('hods'),
     db.schema.hasTable('classrooms'),
     db.schema.hasTable('faculty'),
     db.schema.hasTable('subjects'),
@@ -28,6 +30,7 @@ export async function initializeDatabase() {
     db.schema.hasTable('resources'),
     db.schema.hasTable('classroom_bookings'),
     db.schema.hasTable('booking_requests'),
+    db.schema.hasTable('resource_requests'),
   ]);
 
   if (!tablesExist[0]) {
