@@ -47,6 +47,7 @@ import {
 import TimetableManagement from "../components/TimetableManagement";
 import ClassAllotmentModule from "../components/ClassAllotmentModule";
 import ResourceOverview from "../components/ResourceOverview";
+import ResourceRequestManagement from "../components/ResourceRequestManagement";
 
 export default function HODDashboard() {
   const navigate = useNavigate();
