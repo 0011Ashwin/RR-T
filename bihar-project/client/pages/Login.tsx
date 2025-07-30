@@ -312,24 +312,40 @@ export default function Login() {
                       </div>
                     </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          const response = await fetch('/api/hod-auth/test-hods');
-                          const data = await response.json();
-                          console.log('Test HODs response:', data);
-                          toast.success(`Found ${data.count} HODs in database`);
-                        } catch (error) {
-                          console.error('Test HODs error:', error);
-                          toast.error('Failed to test HOD endpoint');
-                        }
-                      }}
-                      className="w-full"
-                    >
-                      Test HOD Database Connection
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('/api/hod-auth/test-hods');
+                            const data = await response.json();
+                            console.log('Test HODs response:', data);
+                            toast.success(`Found ${data.count} HODs in database`);
+                          } catch (error) {
+                            console.error('Test HODs error:', error);
+                            toast.error('Failed to test HOD endpoint');
+                          }
+                        }}
+                      >
+                        Test DB
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCredentials({
+                            email: 'amitabh.singh@bec.ac.in',
+                            password: 'hod123'
+                          });
+                          setAdminSubRole('hod');
+                          toast.info('Credentials filled for HOD demo');
+                        }}
+                      >
+                        Fill Demo
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
