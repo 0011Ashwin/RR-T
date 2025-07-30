@@ -764,16 +764,43 @@ export default function Index() {
                     </div>
                     <CardTitle>Admin Portal</CardTitle>
                     <CardDescription>
-                      Login with Email and Password
+                      Login as VC, Principal, or HOD
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="admin-email">Email</Label>
+                      <Label htmlFor="admin-type">Admin Type</Label>
+                      <Select
+                        value={adminSubRole}
+                        onValueChange={(value: 'vc' | 'principal' | 'hod') => {
+                          console.log('Admin type changed to:', value);
+                          setAdminSubRole(value);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select admin type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="vc">Vice Chancellor (VC)</SelectItem>
+                          <SelectItem value="principal">Principal</SelectItem>
+                          <SelectItem value="hod">Head of Department (HOD)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-email">
+                        {adminSubRole === 'hod' ? 'HOD Email' : 'Email'}
+                      </Label>
                       <Input
                         id="admin-email"
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder={
+                          adminSubRole === 'hod'
+                            ? 'Enter your HOD email (e.g., amitabh.singh@bec.ac.in)'
+                            : adminSubRole === 'vc'
+                              ? 'vc@example.com'
+                              : 'principal@example.com'
+                        }
                         value={credentials.email}
                         onChange={(e) =>
                           setCredentials((prev) => ({
@@ -784,11 +811,17 @@ export default function Index() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="admin-password">Password</Label>
+                      <Label htmlFor="admin-password">
+                        {adminSubRole === 'hod' ? 'HOD Password' : 'Password'}
+                      </Label>
                       <Input
                         id="admin-password"
                         type="password"
-                        placeholder="Enter your password"
+                        placeholder={
+                          adminSubRole === 'hod'
+                            ? 'Enter your HOD password (default: hod123)'
+                            : 'Enter your password'
+                        }
                         value={credentials.password}
                         onChange={(e) =>
                           setCredentials((prev) => ({
@@ -798,13 +831,41 @@ export default function Index() {
                         }
                       />
                     </div>
+
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+
                     <Button
                       className="w-full bg-admin hover:bg-admin/90 text-admin-foreground"
                       onClick={handleLogin}
-                      disabled={!credentials.email || !credentials.password}
+                      disabled={!credentials.email || !credentials.password || isLoading}
                     >
-                      Login as Admin
+                      {isLoading ? (
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Signing in...
+                        </div>
+                      ) : (
+                        `Login as ${adminSubRole === 'vc' ? 'VC' : adminSubRole === 'principal' ? 'Principal' : 'HOD'}`
+                      )}
                     </Button>
+
+                    {adminSubRole === 'hod' && (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="text-sm text-blue-800">
+                          <strong>Demo HOD Accounts:</strong>
+                          <div className="mt-1 space-y-1 text-xs">
+                            <div>• amitabh.singh@bec.ac.in (CSE)</div>
+                            <div>• sunita.kumari@bec.ac.in (ECE)</div>
+                            <div>• manoj.kumar@msc.ac.in (Physics)</div>
+                            <div className="mt-2"><strong>Password:</strong> hod123</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
