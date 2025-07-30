@@ -299,16 +299,37 @@ export default function Login() {
                 </Button>
 
                 {adminSubRole === 'hod' && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="text-sm text-blue-800">
-                      <strong>Demo HOD Accounts:</strong>
-                      <div className="mt-1 space-y-1 text-xs">
-                        <div>• amitabh.singh@bec.ac.in (CSE Department)</div>
-                        <div>• sunita.kumari@bec.ac.in (ECE Department)</div>
-                        <div>• manoj.kumar@msc.ac.in (Physics Department)</div>
-                        <div className="mt-2"><strong>Password:</strong> hod123 (for all accounts)</div>
+                  <div className="mt-4 space-y-3">
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="text-sm text-blue-800">
+                        <strong>Demo HOD Accounts:</strong>
+                        <div className="mt-1 space-y-1 text-xs">
+                          <div>• amitabh.singh@bec.ac.in (CSE Department)</div>
+                          <div>• sunita.kumari@bec.ac.in (ECE Department)</div>
+                          <div>• manoj.kumar@msc.ac.in (Physics Department)</div>
+                          <div className="mt-2"><strong>Password:</strong> hod123 (for all accounts)</div>
+                        </div>
                       </div>
                     </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/hod-auth/test-hods');
+                          const data = await response.json();
+                          console.log('Test HODs response:', data);
+                          toast.success(`Found ${data.count} HODs in database`);
+                        } catch (error) {
+                          console.error('Test HODs error:', error);
+                          toast.error('Failed to test HOD endpoint');
+                        }
+                      }}
+                      className="w-full"
+                    >
+                      Test HOD Database Connection
+                    </Button>
                   </div>
                 )}
               </CardContent>
