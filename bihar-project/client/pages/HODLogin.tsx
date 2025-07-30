@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useHODAuth } from '@/hooks/use-hod-auth';
-import { Building2, LogIn, User, Mail } from 'lucide-react';
+import { Building2, LogIn, User, Mail, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function HODLogin() {
   const navigate = useNavigate();
