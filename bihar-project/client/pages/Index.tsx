@@ -876,15 +876,53 @@ export default function Index() {
                     </Button>
 
                     {adminSubRole === 'hod' && (
-                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="text-sm text-blue-800">
-                          <strong>Demo HOD Accounts:</strong>
-                          <div className="mt-1 space-y-1 text-xs">
-                            <div>• amitabh.singh@bec.ac.in (CSE)</div>
-                            <div>• sunita.kumari@bec.ac.in (ECE)</div>
-                            <div>• manoj.kumar@msc.ac.in (Physics)</div>
-                            <div className="mt-2"><strong>Password:</strong> hod123</div>
+                      <div className="mt-4 space-y-3">
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="text-sm text-blue-800">
+                            <strong>Demo HOD Accounts:</strong>
+                            <div className="mt-1 space-y-1 text-xs">
+                              <div>• amitabh.singh@bec.ac.in (CSE)</div>
+                              <div>• sunita.kumari@bec.ac.in (ECE)</div>
+                              <div>• manoj.kumar@msc.ac.in (Physics)</div>
+                              <div className="mt-2"><strong>Password:</strong> hod123</div>
+                            </div>
                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                console.log('Testing HOD endpoint...');
+                                const response = await fetch('/api/hod-auth/test-hods');
+                                console.log('Test response:', response.status, response.statusText);
+                                const data = await response.json();
+                                console.log('Test data:', data);
+                                toast.success(`DB Test: Found ${data.count} HODs`);
+                              } catch (error) {
+                                console.error('Test error:', error);
+                                toast.error('DB Test failed');
+                              }
+                            }}
+                          >
+                            Test DB
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCredentials({
+                                email: 'amitabh.singh@bec.ac.in',
+                                password: 'hod123'
+                              });
+                              toast.info('Demo credentials filled');
+                            }}
+                          >
+                            Fill Demo
+                          </Button>
                         </div>
                       </div>
                     )}
