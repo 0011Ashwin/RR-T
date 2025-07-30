@@ -71,11 +71,14 @@ import {
 export default function Index() {
   const navigate = useNavigate();
   const [activeRole, setActiveRole] = useState<"student" | "admin">("student");
+  const [adminSubRole, setAdminSubRole] = useState<'vc' | 'principal' | 'hod'>('vc');
   const [credentials, setCredentials] = useState({
     email: "",
     password: "",
   });
   const [loginOpen, setLoginOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const newsScrollRef = useRef<HTMLDivElement>(null);
   const [isNewsHovered, setIsNewsHovered] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
