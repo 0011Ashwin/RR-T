@@ -3,24 +3,44 @@ import { HODModel } from '../models/HOD.js';
 
 const router = Router();
 
+// Test route to check HODs
+router.get('/test-hods', async (req, res) => {
+  try {
+    const hods = await HODModel.getAll();
+    res.json({
+      message: 'HODs found',
+      count: hods.length,
+      hods: hods.map(h => ({ id: h.id, name: h.name, email: h.email, is_active: h.is_active }))
+    });
+  } catch (error) {
+    console.error('Error fetching HODs:', error);
+    res.status(500).json({ error: 'Failed to fetch HODs' });
+  }
+});
+
 // HOD Login
 router.post('/login', async (req, res) => {
   try {
+    console.log('Login attempt:', req.body);
     const { email, password } = req.body;
 
     if (!email || !password) {
+      console.log('Missing email or password');
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
     // Authenticate HOD
+    console.log('Attempting authentication for:', email);
     const hod = await HODModel.authenticate(email, password);
-    
+    console.log('Authentication result:', hod ? 'Success' : 'Failed');
+
     if (!hod) {
       return res.status(401).json({ error: 'Invalid credentials or inactive account' });
     }
 
     // In a real app, you would generate a JWT token here
     // For now, we'll just return the HOD data
+    console.log('Login successful for:', hod.name);
     res.json({
       success: true,
       message: 'Login successful',
