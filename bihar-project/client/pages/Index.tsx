@@ -180,17 +180,15 @@ export default function Index() {
 
             console.log('HOD auth response status:', response.status);
 
-            // Check content type before reading the body
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-              const errorText = await response.text();
-              console.error('Non-JSON response received:', errorText);
-              throw new Error('Server returned non-JSON response');
+            let data;
+            try {
+              // Try to parse as JSON
+              data = await response.json();
+              console.log('HOD auth response data:', data);
+            } catch (parseError) {
+              console.error('Failed to parse response as JSON:', parseError);
+              throw new Error('Invalid server response format');
             }
-
-            // Read the response body only once
-            const data = await response.json();
-            console.log('HOD auth response data:', data);
 
             if (response.ok && data.success) {
               // Store HOD data in localStorage
@@ -205,7 +203,13 @@ export default function Index() {
             }
           } catch (authError) {
             console.error('HOD auth error:', authError);
-            setError('Failed to authenticate HOD. Please try again.');
+            if (authError.message.includes('stream')) {
+              setError('Connection error. Please try again.');
+            } else if (authError.message.includes('JSON')) {
+              setError('Server error. Please try again later.');
+            } else {
+              setError('Failed to authenticate HOD. Please try again.');
+            }
           }
         } else {
           // Handle VC and Principal login with static accounts
