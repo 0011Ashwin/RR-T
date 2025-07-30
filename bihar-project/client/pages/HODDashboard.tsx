@@ -234,7 +234,7 @@ export default function HODDashboard() {
 
   const handleLogout = () => {
     logout();
-    navigate("/hod-login");
+    navigate("/");
   };
 
   const getPriorityColor = (priority: string) => {
