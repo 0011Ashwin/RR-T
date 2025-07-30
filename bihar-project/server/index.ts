@@ -44,6 +44,10 @@ export async function createServer() {
   try {
     await initializeDatabase();
     console.log('Database initialized successfully');
+
+    // Seed database with sample data (only on first run)
+    await seedDatabase();
+
   } catch (error) {
     console.error('Error initializing database:', error);
   }
