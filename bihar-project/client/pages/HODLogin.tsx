@@ -14,6 +14,7 @@ export default function HODLogin() {
   const navigate = useNavigate();
   const { login, allHODs } = useHODAuth();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,15 +23,36 @@ export default function HODLogin() {
     setIsLoading(true);
     setError('');
 
+    if (!email || !password) {
+      setError('Please enter both email and password.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const success = await login(email);
-      if (success) {
+      // Use backend authentication
+      const response = await fetch('/api/hod-auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Store HOD data in localStorage to work with existing useHODAuth hook
+        localStorage.setItem('currentHODId', data.hod.id.toString());
+        localStorage.setItem('userRole', 'hod');
+        toast.success('Login successful!');
         navigate('/department');
       } else {
-        setError('Invalid email or HOD account not found.');
+        const errorData = await response.json();
+        setError(errorData.error || 'Login failed. Please check your credentials.');
       }
     } catch (err) {
       setError('Login failed. Please try again.');
+      console.error('Login error:', err);
     } finally {
       setIsLoading(false);
     }
