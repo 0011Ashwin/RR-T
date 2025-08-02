@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHODAuth } from '@/hooks/use-hod-auth';
 import { useToast } from '@/hooks/use-toast';
-import { Routine, ClassSession, Course, Resource, DEFAULT_TIME_SLOTS } from '@shared/resource-types';
+import { Routine, ClassSession, Course, Resource, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
 import { exportRoutine } from '@/lib/export-utils';
 import { TimetableService } from '@/services/timetable-service';
+import { ResourceService } from '@/services/resource-service';
+import axios from 'axios';
 import { 
   Calendar,
   Download,
@@ -61,43 +63,50 @@ export default function RoutineBuilder() {
 
     const fetchRoutines = async () => {
       try {
-        const response = await axios.get('/api/timetables');
-        const fetchedRoutines: Routine[] = response.data.map((rt: any) => ({
-          id: rt.id,
-          name: rt.name,
-          department: currentHOD?.department || 'Unknown',
-          semester: rt.semester,
-          section: rt.section,
-          academicYear: rt.academic_year,
-          sessions: rt.entries.map((entry: any) => ({
-            id: entry.id,
-            courseId: entry.subject_id.toString(),
-            resourceId: entry.classroom_id.toString(),
-            faculty: entry.faculty_id.toString(),
-            dayOfWeek: entry.day_of_week,
-            timeSlotId: DEFAULT_TIME_SLOTS.find(t => t.start === entry.start_time && t.end === entry.end_time)?.id || '',
-            type: 'theory', // Assuming default type, adjust if type is available in backend
-          })),
-          isActive: rt.is_active,
-          generatedAt: rt.created_at,
-          createdAt: rt.created_at,
-          updatedAt: rt.updated_at,
-        }));
-        setRoutines(fetchedRoutines);
-        updateRoutineViews(fetchedRoutines);
+        const response = await TimetableService.getTimetablesByDepartment(currentHOD.department);
+        if (response.success && response.data) {
+          const fetchedRoutines: Routine[] = response.data.map((rt: any) => ({
+            id: rt.id.toString(),
+            name: rt.name,
+            department: currentHOD.department,
+            semester: rt.semester,
+            section: rt.section || 'A',
+            academicYear: rt.academic_year || '2024-25',
+            sessions: rt.entries ? rt.entries.map((entry: any) => ({
+              id: entry.id.toString(),
+              courseId: entry.subject_id.toString(),
+              resourceId: entry.classroom_id.toString(),
+              faculty: entry.faculty_name || entry.faculty_id.toString(),
+              dayOfWeek: entry.day_of_week,
+              timeSlotId: DEFAULT_TIME_SLOTS.find(t => 
+                t.startTime === entry.start_time && t.endTime === entry.end_time
+              )?.id || '1',
+              type: 'theory',
+            })) : [],
+            generatedBy: currentHOD.name,
+            generatedAt: rt.created_at || new Date().toISOString(),
+            isActive: rt.is_active !== false,
+            version: 1,
+          }));
+          setRoutines(fetchedRoutines);
+          updateRoutineViews(fetchedRoutines);
+        }
       } catch (error) {
         console.error('Error fetching routines:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load routines from database.",
+          variant: "destructive",
+        });
       }
     };
 
-    fetchRoutines();
-
-
-
     const fetchResources = async () => {
       try {
-        const response = await axios.get('/api/resources');
-        setResources(response.data);
+        const response = await ResourceService.getResourcesByDepartment(currentHOD.department);
+        if (response.success && response.data) {
+          setResources(response.data);
+        }
       } catch (error) {
         console.error('Error fetching resources:', error);
       }
@@ -105,20 +114,29 @@ export default function RoutineBuilder() {
 
     const fetchCourses = async () => {
       try {
-        const response = await axios.get('/api/subjects'); // Assuming /api/subjects is the endpoint for courses
-        setCourses(response.data);
+        const response = await axios.get('/api/subjects');
+        const coursesData = response.data.map((subject: any) => ({
+          id: subject.id.toString(),
+          name: subject.name,
+          code: subject.code,
+          department: currentHOD.department,
+          semester: subject.semester || 1,
+          section: subject.section || 'A',
+          faculty: subject.faculty_name || 'TBD',
+          type: subject.type || 'theory',
+          weeklyHours: subject.weekly_hours || 3,
+          expectedSize: subject.expected_size || 30,
+        }));
+        setCourses(coursesData);
       } catch (error) {
         console.error('Error fetching courses:', error);
       }
     };
 
+    fetchRoutines();
     fetchResources();
     fetchCourses();
-
-    // The sample routine generation will need to be updated to use fetched data
-    // For now, we'll keep it commented out or modify it to run after data is fetched.
-    // generateRoutine();
-  }, [currentHOD]);
+  }, [currentHOD, toast]);
 
   useEffect(() => {
     updateRoutineViews(routines);
@@ -142,9 +160,9 @@ export default function RoutineBuilder() {
                               (course.type === 'theory' && (resource.type === 'classroom' || resource.type === 'seminar_hall'));
             
             const isSlotFree = !sessions.some(s => 
-              s.resource.id === resource.id && 
-              s.timeSlot === `${timeSlot.start} - ${timeSlot.end}` && 
-              s.day === DAYS[day - 1]
+              s.resourceId === resource.id!.toString() && 
+              s.timeSlotId === timeSlot.id && 
+              s.dayOfWeek === day
             );
             
             return hasCapacity && isRightType && isSlotFree;
@@ -154,7 +172,7 @@ export default function RoutineBuilder() {
             sessions.push({
               id: `session_${sessionId++}`,
               courseId: course.id,
-              resourceId: suitableResource.id!,
+              resourceId: suitableResource.id!.toString(),
               faculty: course.faculty,
               dayOfWeek: day,
               timeSlotId: timeSlot.id,
@@ -198,64 +216,104 @@ export default function RoutineBuilder() {
   };
 
   const createNewRoutine = async () => {
-    if (!newRoutineForm.name || !newRoutineForm.academicYear) {
-      alert('Please fill in all required fields.');
+    if (!newRoutineForm.name || !newRoutineForm.academicYear || !currentHOD) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
       return;
     }
 
-    // Check if a routine with the same semester, section, and academic year already exists
+    console.log('Current HOD:', currentHOD);
+
+    // Check if a routine with the same name, semester, section, and academic year already exists
+    // This allows multiple routines for the same semester/section/year as long as they have different names (e.g., BBA, BCA)
     const existingRoutine = routines.find(r => 
+      r.name === newRoutineForm.name &&
       r.semester === newRoutineForm.semester &&
       r.section === newRoutineForm.section &&
       r.academicYear === newRoutineForm.academicYear
     );
 
     if (existingRoutine) {
-      alert('A routine for this semester, section, and academic year already exists.');
+      toast({
+        title: "Error",
+        description: "A routine with this exact name, semester, section, and academic year already exists.",
+        variant: "destructive",
+      });
       return;
     }
 
-    // Filter courses and resources relevant to the new routine's department
-    const relevantCourses = courses.filter(c => 
-      c.department === currentHOD?.department &&
-      c.semester === newRoutineForm.semester &&
-      c.section === newRoutineForm.section
-    );
-    const relevantResources = resources.filter(r => 
-      r.department === currentHOD?.department || r.isShared
-    );
-
-    // Auto-generate routine for the new configuration
-    const generatedSessions = autoGenerateSessions(relevantCourses, relevantResources);
-
-    const newTimetableData = {
-      name: newRoutineForm.name,
-      semester: newRoutineForm.semester,
-      department_id: currentHOD?.department_id || 0, // Assuming department_id is available in currentHOD
-      section: newRoutineForm.section,
-      academic_year: newRoutineForm.academicYear,
-      is_active: true,
-      entries: generatedSessions.map(session => ({
-        subject_id: parseInt(session.courseId),
-        faculty_id: parseInt(session.faculty),
-        classroom_id: parseInt(session.resourceId),
-        day_of_week: session.dayOfWeek,
-        start_time: DEFAULT_TIME_SLOTS.find(t => t.id === session.timeSlotId)?.start || '',
-        end_time: DEFAULT_TIME_SLOTS.find(t => t.id === session.timeSlotId)?.end || '',
-      })),
-    };
-
     try {
-      const newTimetableData = {
+      // Test API connection first
+      console.log('Testing API connection...');
+      const pingResponse = await axios.get('/api/ping');
+      console.log('Ping response:', pingResponse.data);
+
+      console.log('Creating routine with data:', {
         name: newRoutineForm.name,
-        semester: newRoutineForm.semester,
         department: currentHOD.department,
+        semester: newRoutineForm.semester,
         section: newRoutineForm.section,
         academicYear: newRoutineForm.academicYear,
-        sessions: [], // Start with empty sessions, can be populated later
+      });
+
+      // Filter courses and resources relevant to the new routine's department
+      const relevantCourses = courses.filter(c => 
+        c.department === currentHOD.department &&
+        c.semester === newRoutineForm.semester &&
+        c.section === newRoutineForm.section
+      );
+      const relevantResources = resources.filter(r => 
+        r.department === currentHOD.department || r.isShared
+      );
+
+      console.log('All courses:', courses);
+      console.log('All resources:', resources);
+      console.log('Relevant courses found:', relevantCourses.length, relevantCourses);
+      console.log('Relevant resources found:', relevantResources.length, relevantResources);
+
+      // If no courses or resources, create empty routine but warn user
+      if (relevantCourses.length === 0) {
+        console.warn('No courses found for the department/semester/section');
+        toast({
+          title: "Warning",
+          description: "No courses found for this department, semester, and section. Creating empty routine.",
+        });
+      }
+
+      if (relevantResources.length === 0) {
+        console.warn('No resources found for the department');
+        toast({
+          title: "Warning", 
+          description: "No resources found for this department. Creating routine without room assignments.",
+        });
+      }
+
+      // Auto-generate sessions for the new configuration
+      let generatedSessions: ClassSession[] = [];
+      
+      if (relevantCourses.length > 0 && relevantResources.length > 0) {
+        generatedSessions = autoGenerateSessions(relevantCourses, relevantResources);
+        console.log('Generated sessions:', generatedSessions.length, generatedSessions);
+      } else {
+        console.log('Skipping session generation due to missing courses or resources');
+      }
+
+      // Create the timetable data for the API (without sessions initially)
+      const timetableData = {
+        name: newRoutineForm.name,
+        department: currentHOD.department,
+        semester: newRoutineForm.semester,
+        section: newRoutineForm.section,
+        academicYear: newRoutineForm.academicYear,
+        sessions: [], // Always start with empty sessions to avoid conflicts
       };
 
-      const response = await TimetableService.createTimetable(newTimetableData);
+      console.log('Sending timetable data to API:', timetableData);
+      const response = await TimetableService.createTimetable(timetableData);
+      console.log('API Response:', response);
       
       if (response.success && response.data) {
         // Convert the created timetable to routine format
@@ -266,12 +324,28 @@ export default function RoutineBuilder() {
           semester: response.data.semester,
           section: response.data.section || 'A',
           academicYear: response.data.academicYear || '2024-25',
-          sessions: [],
+          sessions: [], // Start with empty sessions
           generatedBy: currentHOD.name,
           generatedAt: new Date().toISOString(),
           isActive: true,
           version: 1,
         };
+
+        // Save timetable entries if sessions were generated
+        let successfulSessions: ClassSession[] = [];
+        if (generatedSessions.length > 0) {
+          console.log('Saving timetable entries...');
+          try {
+            await saveTimetableEntries(response.data.id.toString(), generatedSessions);
+            successfulSessions = generatedSessions;
+          } catch (error) {
+            console.warn('Some entries could not be saved due to conflicts, but routine was created');
+            // Even if some entries fail, we can still show the routine
+          }
+        }
+
+        // Update the routine with successful sessions
+        newRoutine.sessions = successfulSessions;
 
         const updatedRoutines = [...routines, newRoutine];
         setRoutines(updatedRoutines);
@@ -288,20 +362,130 @@ export default function RoutineBuilder() {
 
         toast({
           title: "Success",
-          description: "Routine created successfully!",
+          description: `Routine created successfully${successfulSessions.length > 0 ? ` with ${successfulSessions.length} sessions` : ''}!`,
         });
       } else {
+        console.error('API returned error:', response);
         toast({
           title: "Error",
           description: response.message || "Failed to create routine.",
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating routine:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      
+      // More detailed error message
+      let errorMessage = "Failed to create routine. Please try again.";
+      if (error.response?.status === 404) {
+        errorMessage = "API endpoint not found. Please ensure the server is running.";
+      } else if (error.response?.status === 500) {
+        errorMessage = "Server error. Please check the server logs.";
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = "Cannot connect to server. Please ensure the server is running.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to create routine. Please try again.",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Helper function to save timetable entries
+  const saveTimetableEntries = async (timetableId: string, sessions: ClassSession[]) => {
+    try {
+      console.log(`Saving ${sessions.length} timetable entries for timetable ${timetableId}`);
+      
+      for (const session of sessions) {
+        const timeSlot = DEFAULT_TIME_SLOTS.find(t => t.id === session.timeSlotId);
+        if (timeSlot) {
+          const entryData = {
+            subject_id: parseInt(session.courseId),
+            faculty_id: parseInt(session.faculty) || 1, // Default faculty if parsing fails
+            classroom_id: parseInt(session.resourceId),
+            day_of_week: session.dayOfWeek,
+            start_time: timeSlot.startTime,
+            end_time: timeSlot.endTime,
+          };
+
+          console.log('Saving entry:', entryData);
+          
+          try {
+            await axios.post(`/api/timetables/${timetableId}/entries`, entryData);
+            console.log('Entry saved successfully');
+          } catch (entryError: any) {
+            console.error('Error saving individual entry:', entryError.response?.data || entryError.message);
+            // Continue with other entries instead of failing completely
+            if (entryError.response?.data?.message?.includes('conflicts')) {
+              console.warn('Skipping entry due to conflict:', entryData);
+            } else {
+              throw entryError; // Re-throw if it's not a conflict error
+            }
+          }
+        }
+      }
+      console.log('Finished saving timetable entries');
+    } catch (error) {
+      console.error('Error saving timetable entries:', error);
+      throw error;
+    }
+  };
+
+  // Function to auto-generate sessions for an existing routine
+  const autoGenerateForRoutine = async (routine: Routine) => {
+    if (!currentHOD) return;
+
+    try {
+      // Get courses for this semester and section
+      const relevantCourses = courses.filter(c => 
+        c.department === currentHOD.department &&
+        c.semester === routine.semester &&
+        c.section === routine.section
+      );
+      
+      // Get available resources
+      const availableResources = resources.filter(r => 
+        r.department === currentHOD.department || r.isShared
+      );
+
+      // Generate new sessions
+      const newSessions = autoGenerateSessions(relevantCourses, availableResources);
+      
+      // Save the new sessions to database
+      if (newSessions.length > 0) {
+        await saveTimetableEntries(routine.id, newSessions);
+        
+        // Update the routine in state
+        const updatedRoutines = routines.map(r => 
+          r.id === routine.id 
+            ? { ...r, sessions: [...r.sessions, ...newSessions] }
+            : r
+        );
+        setRoutines(updatedRoutines);
+        updateRoutineViews(updatedRoutines);
+        
+        toast({
+          title: "Success",
+          description: `Added ${newSessions.length} new sessions to the routine!`,
+        });
+      } else {
+        toast({
+          title: "Info",
+          description: "No additional sessions could be generated. All courses may already be scheduled.",
+        });
+      }
+    } catch (error) {
+      console.error('Error auto-generating sessions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate additional sessions.",
         variant: "destructive",
       });
     }
@@ -327,7 +511,7 @@ export default function RoutineBuilder() {
   };
 
   const getResourceName = (resourceId: string) => {
-    return resources.find(r => r.id === resourceId)?.name || 'Unknown Resource';
+    return resources.find(r => r.id!.toString() === resourceId)?.name || 'Unknown Resource';
   };
 
   const getTimeSlotLabel = (timeSlotId: string) => {
@@ -391,7 +575,7 @@ export default function RoutineBuilder() {
                     id="routineName"
                     value={newRoutineForm.name}
                     onChange={(e) => setNewRoutineForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., Geography Semester 2 - Section B"
+                    placeholder="e.g., BCA, BBA, Geography, Mathematics"
                   />
                 </div>
                 
