@@ -38,7 +38,7 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 export default function BookingRequests() {
   const { currentHOD, allHODs } = useHODAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('received');
+  const [activeTab, setActiveTab] = useState('received-pending');
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<BookingRequest | null>(null);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
@@ -90,12 +90,28 @@ export default function BookingRequests() {
     fetchBookingRequests();
   }, [currentHOD, toast]);
 
-  const receivedRequests = bookingRequests.filter(req => 
-    req.targetDepartment === currentHOD?.department && req.requesterId !== currentHOD?.id
+  // Filter received requests
+  const receivedPendingRequests = bookingRequests.filter(req => 
+    req.targetDepartment === currentHOD?.department && 
+    req.requesterId !== currentHOD?.id && 
+    req.status === 'pending'
   );
 
-  const sentRequests = bookingRequests.filter(req => 
-    req.requesterId === currentHOD?.id
+  const receivedProcessedRequests = bookingRequests.filter(req => 
+    req.targetDepartment === currentHOD?.department && 
+    req.requesterId !== currentHOD?.id && 
+    req.status !== 'pending'
+  );
+
+  // Filter sent requests
+  const sentPendingRequests = bookingRequests.filter(req => 
+    req.requesterId === currentHOD?.id && 
+    req.status === 'pending'
+  );
+
+  const sentProcessedRequests = bookingRequests.filter(req => 
+    req.requesterId === currentHOD?.id && 
+    req.status !== 'pending'
   );
 
   const handleResponse = async (action: 'approve' | 'reject') => {
@@ -212,32 +228,40 @@ export default function BookingRequests() {
 
       {/* Request Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="received" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Received Requests ({receivedRequests.length})
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="received-pending" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
+            <Clock className="h-4 w-4 mr-2" />
+            Pending ({receivedPendingRequests.length})
           </TabsTrigger>
-          <TabsTrigger value="sent" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
+          <TabsTrigger value="received-processed" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Processed ({receivedProcessedRequests.length})
+          </TabsTrigger>
+          <TabsTrigger value="sent-pending" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
             <Send className="h-4 w-4 mr-2" />
-            Sent Requests ({sentRequests.length})
+            Sent Pending ({sentPendingRequests.length})
+          </TabsTrigger>
+          <TabsTrigger value="sent-processed" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Sent Processed ({sentProcessedRequests.length})
           </TabsTrigger>
         </TabsList>
 
-        {/* Received Requests */}
-        <TabsContent value="received" className="space-y-4">
-          {receivedRequests.length === 0 ? (
+        {/* Received Pending Requests */}
+        <TabsContent value="received-pending" className="space-y-4">
+          {receivedPendingRequests.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
-                <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">No received requests</h3>
+                <Clock className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">No pending requests</h3>
                 <p className="text-slate-600">
-                  No other departments have requested to use your resources yet.
+                  No departments are currently requesting to use your resources.
                 </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
-              {receivedRequests.map(request => (
+              {receivedPendingRequests.map(request => (
                 <Card key={request.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
@@ -326,21 +350,105 @@ export default function BookingRequests() {
           )}
         </TabsContent>
 
-        {/* Sent Requests */}
-        <TabsContent value="sent" className="space-y-4">
-          {sentRequests.length === 0 ? (
+        {/* Received Processed Requests */}
+        <TabsContent value="received-processed" className="space-y-4">
+          {receivedProcessedRequests.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
-                <Send className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">No sent requests</h3>
+                <CheckCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">No processed requests</h3>
                 <p className="text-slate-600">
-                  You haven't sent any resource booking requests yet.
+                  You haven't approved or rejected any requests yet.
                 </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
-              {sentRequests.map(request => (
+              {receivedProcessedRequests.map(request => (
+                <Card key={request.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            {request.courseName}
+                          </h3>
+                          <Badge className={`text-xs ${getStatusColor(request.status)}`}>
+                            <div className="flex items-center space-x-1">
+                              {getStatusIcon(request.status)}
+                              <span className="capitalize">{request.status}</span>
+                            </div>
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-600 mb-3">
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 mr-2" />
+                            {request.requesterDepartment}
+                          </div>
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            {DAYS[request.dayOfWeek]}
+                          </div>
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-2" />
+                            {getTimeSlotLabel(request.timeSlotId)}
+                          </div>
+                          <div className="flex items-center">
+                            <Building2 className="h-4 w-4 mr-2" />
+                            {request.expectedAttendance} people
+                          </div>
+                        </div>
+
+                        <div className="text-sm text-slate-600 mb-3">
+                          <span className="font-medium">Requested by:</span> {getRequesterName(request.requesterId)}
+                        </div>
+
+                        {request.purpose && (
+                          <div className="text-sm text-slate-600 mb-3">
+                            <span className="font-medium">Purpose:</span> {request.purpose}
+                          </div>
+                        )}
+
+                        <div className="text-xs text-slate-500">
+                          Requested: {new Date(request.requestDate).toLocaleString()}
+                          {request.responseDate && (
+                            <span className="ml-4">
+                              Responded: {new Date(request.responseDate).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+
+                        {request.notes && filterInternalData(request.notes) && (
+                          <div className="mt-3 p-3 bg-slate-50 rounded-lg">
+                            <div className="text-sm font-medium text-slate-700 mb-1">Response Notes:</div>
+                            <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Sent Pending Requests */}
+        <TabsContent value="sent-pending" className="space-y-4">
+          {sentPendingRequests.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Send className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">No pending sent requests</h3>
+                <p className="text-slate-600">
+                  You don't have any pending resource booking requests.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {sentPendingRequests.map(request => (
                 <Card key={request.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
@@ -449,6 +557,86 @@ export default function BookingRequests() {
                           Withdraw
                         </Button>
                       )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Sent Processed Requests */}
+        <TabsContent value="sent-processed" className="space-y-4">
+          {sentProcessedRequests.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <CheckCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">No processed sent requests</h3>
+                <p className="text-slate-600">
+                  You don't have any approved, rejected, or withdrawn requests yet.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {sentProcessedRequests.map(request => (
+                <Card key={request.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            {request.courseName}
+                          </h3>
+                          <Badge className={`text-xs ${getStatusColor(request.status)}`}>
+                            <div className="flex items-center space-x-1">
+                              {getStatusIcon(request.status)}
+                              <span className="capitalize">{request.status}</span>
+                            </div>
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-600 mb-3">
+                          <div className="flex items-center">
+                            <Building2 className="h-4 w-4 mr-2" />
+                            {request.targetDepartment}
+                          </div>
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            {DAYS[request.dayOfWeek]}
+                          </div>
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-2" />
+                            {getTimeSlotLabel(request.timeSlotId)}
+                          </div>
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 mr-2" />
+                            {request.expectedAttendance} people
+                          </div>
+                        </div>
+
+                        {request.purpose && (
+                          <div className="text-sm text-slate-600 mb-3">
+                            <span className="font-medium">Purpose:</span> {request.purpose}
+                          </div>
+                        )}
+
+                        <div className="text-xs text-slate-500">
+                          Sent: {new Date(request.requestDate).toLocaleString()}
+                          {request.responseDate && (
+                            <span className="ml-4">
+                              Responded: {new Date(request.responseDate).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+
+                        {request.notes && filterInternalData(request.notes) && (
+                          <div className="mt-3 p-3 bg-slate-50 rounded-lg">
+                            <div className="text-sm font-medium text-slate-700 mb-1">Response Notes:</div>
+                            <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
