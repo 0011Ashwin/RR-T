@@ -54,10 +54,45 @@ router.get('/department/:departmentId', async (req, res) => {
 router.get('/department/name/:department', async (req, res) => {
   try {
     const department = req.params.department;
-    const timetables = await TimetableModel.getByDepartmentName(department);
+    console.log('Fetching timetables for department:', department);
+    
+    // Get timetables with their entries
+    const timetables = await db('timetables')
+      .join('departments', 'timetables.department_id', 'departments.id')
+      .where('departments.name', department)
+      .select('timetables.*', 'departments.name as department_name');
+    
+    console.log('Found timetables:', timetables.length);
+    
+    // For each timetable, get its entries with related data
+    const timetablesWithEntries = await Promise.all(
+      timetables.map(async (timetable) => {
+        const entries = await db('timetable_entries')
+          .join('subjects', 'timetable_entries.subject_id', '=', 'subjects.id')
+          .join('faculty', 'timetable_entries.faculty_id', '=', 'faculty.id')
+          .join('classrooms', 'timetable_entries.classroom_id', '=', 'classrooms.id')
+          .where('timetable_entries.timetable_id', timetable.id)
+          .select(
+            'timetable_entries.*',
+            'subjects.name as subject_name',
+            'subjects.code as subject_code',
+            'faculty.name as faculty_name',
+            'classrooms.name as classroom_name',
+            'classrooms.room_number as classroom_room_number'
+          );
+        
+        return {
+          ...timetable,
+          entries,
+        };
+      })
+    );
+    
+    console.log('Timetables with entries:', timetablesWithEntries);
+    
     res.json({
       success: true,
-      data: timetables
+      data: timetablesWithEntries
     });
   } catch (error) {
     console.error('Error fetching department timetables:', error);

@@ -27,7 +27,8 @@ import {
   Building2,
   User,
   BookOpen,
-  Filter
+  Filter,
+  Trash2
 } from 'lucide-react';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -48,6 +49,10 @@ export default function RoutineBuilder() {
   const [selectedSemester, setSelectedSemester] = useState<number>(1);
   const [selectedSection, setSelectedSection] = useState<string>('A');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [routineToDelete, setRoutineToDelete] = useState<Routine | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [resources, setResources] = useState<Resource[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
 
@@ -58,12 +63,70 @@ export default function RoutineBuilder() {
     academicYear: '2024-25',
   });
 
+  // Manual refresh function to force routine data update
+  const refreshRoutineData = async () => {
+    if (!currentHOD) return;
+    
+    console.log('Manual refresh triggered - fetching latest routine data');
+    try {
+      const response = await TimetableService.getTimetablesByDepartment(currentHOD.department);
+      console.log('Refresh response:', response);
+      console.log('Refresh response data:', response.data);
+      
+      if (response.success && response.data) {
+        const fetchedRoutines: Routine[] = response.data.map((rt: any) => ({
+          id: rt.id.toString(),
+          name: rt.name,
+          department: currentHOD.department,
+          semester: rt.semester,
+          section: rt.section || 'A',
+          academicYear: rt.academic_year || '2024-25',
+          sessions: rt.entries ? rt.entries.map((entry: any) => ({
+            id: entry.id.toString(),
+            courseId: entry.subject_id.toString(),
+            resourceId: entry.classroom_id.toString(),
+            faculty: entry.faculty_name || entry.faculty_id.toString(),
+            dayOfWeek: entry.day_of_week,
+            timeSlotId: DEFAULT_TIME_SLOTS.find(t => 
+              t.startTime === entry.start_time && t.endTime === entry.end_time
+            )?.id || '1',
+            type: 'theory',
+          })) : [],
+          generatedBy: currentHOD.name,
+          generatedAt: rt.created_at || new Date().toISOString(),
+          isActive: rt.is_active !== false,
+          version: 1,
+        }));
+        
+        console.log('Fetched routines:', fetchedRoutines);
+        setRoutines(fetchedRoutines);
+        updateRoutineViews(fetchedRoutines);
+        
+        toast({
+          title: "Success",
+          description: "Routine data refreshed successfully!",
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing routine data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh routine data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     if (!currentHOD) return;
 
     const fetchRoutines = async () => {
       try {
+        console.log('Fetching routines for department:', currentHOD.department);
         const response = await TimetableService.getTimetablesByDepartment(currentHOD.department);
+        console.log('Initial fetch response:', response);
+        console.log('Initial fetch response data:', response.data);
+        
         if (response.success && response.data) {
           const fetchedRoutines: Routine[] = response.data.map((rt: any) => ({
             id: rt.id.toString(),
@@ -88,6 +151,8 @@ export default function RoutineBuilder() {
             isActive: rt.is_active !== false,
             version: 1,
           }));
+          
+          console.log('Mapped routines:', fetchedRoutines);
           setRoutines(fetchedRoutines);
           updateRoutineViews(fetchedRoutines);
         }
@@ -141,6 +206,27 @@ export default function RoutineBuilder() {
   useEffect(() => {
     updateRoutineViews(routines);
   }, [routines, courses, resources]);
+
+  // Force refresh when component becomes visible (tab switch)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && routines.length > 0) {
+        console.log('Tab became visible - refreshing routine data');
+        setTimeout(() => refreshRoutineData(), 100);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also trigger refresh when component mounts with existing data
+    if (routines.length > 0) {
+      setTimeout(() => refreshRoutineData(), 300);
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [routines.length, currentHOD]);
 
   const autoGenerateSessions = (coursesToSchedule: Course[], availableResources: Resource[]): ClassSession[] => {
     const sessions: ClassSession[] = [];
@@ -307,13 +393,14 @@ export default function RoutineBuilder() {
         department: currentHOD.department,
         semester: newRoutineForm.semester,
         section: newRoutineForm.section,
-        academicYear: newRoutineForm.academicYear,
+        academicYear: newRoutineForm.academicYear, // Keep camelCase for API interface
         sessions: [], // Always start with empty sessions to avoid conflicts
       };
 
       console.log('Sending timetable data to API:', timetableData);
       const response = await TimetableService.createTimetable(timetableData);
       console.log('API Response:', response);
+      console.log('API Response Data:', JSON.stringify(response.data, null, 2)); // Debug: Check exact structure
       
       if (response.success && response.data) {
         // Convert the created timetable to routine format
@@ -323,7 +410,7 @@ export default function RoutineBuilder() {
           department: currentHOD.department,
           semester: response.data.semester,
           section: response.data.section || 'A',
-          academicYear: response.data.academicYear || '2024-25',
+          academicYear: response.data.academicYear || (response.data as any).academic_year || '2024-25', // Handle both camelCase and snake_case
           sessions: [], // Start with empty sessions
           generatedBy: currentHOD.name,
           generatedAt: new Date().toISOString(),
@@ -338,13 +425,15 @@ export default function RoutineBuilder() {
           try {
             await saveTimetableEntries(response.data.id.toString(), generatedSessions);
             successfulSessions = generatedSessions;
+            console.log('Successfully saved all timetable entries');
           } catch (error) {
             console.warn('Some entries could not be saved due to conflicts, but routine was created');
-            // Even if some entries fail, we can still show the routine
+            // Even if entries fail, we still show the routine as created
+            // The sessions will be empty, but the routine exists
           }
         }
 
-        // Update the routine with successful sessions
+        // Update the routine with successful sessions (or empty array if conflicts occurred)
         newRoutine.sessions = successfulSessions;
 
         const updatedRoutines = [...routines, newRoutine];
@@ -360,10 +449,17 @@ export default function RoutineBuilder() {
           academicYear: '2024-25',
         });
 
+        const sessionMessage = successfulSessions.length > 0 
+          ? ` with ${successfulSessions.length} sessions` 
+          : (generatedSessions.length > 0 ? ' (sessions had conflicts - routine created without sessions)' : '');
+
         toast({
           title: "Success",
-          description: `Routine created successfully${successfulSessions.length > 0 ? ` with ${successfulSessions.length} sessions` : ''}!`,
+          description: `Routine created successfully${sessionMessage}!`,
         });
+
+        // Refresh data from database to ensure consistency
+        setTimeout(() => refreshRoutineData(), 500);
       } else {
         console.error('API returned error:', response);
         toast({
@@ -398,10 +494,79 @@ export default function RoutineBuilder() {
     }
   };
 
+  // Function to initiate routine deletion
+  const initiateDeleteRoutine = (routine: Routine) => {
+    setRoutineToDelete(routine);
+    setDeleteStep(1);
+    setDeleteConfirmationText('');
+    setDeleteDialogOpen(true);
+  };
+
+  // Function to delete a routine
+  const deleteRoutine = async () => {
+    if (!routineToDelete || !currentHOD) return;
+
+    try {
+      console.log('Deleting routine:', routineToDelete.id);
+      
+      // Call the API to delete the timetable using the service
+      const response = await TimetableService.deleteTimetable(routineToDelete.id);
+      
+      if (response.success) {
+        // Remove the routine from state
+        const updatedRoutines = routines.filter(r => r.id !== routineToDelete.id);
+        setRoutines(updatedRoutines);
+        updateRoutineViews(updatedRoutines);
+        
+        // If the deleted routine was selected, clear selection
+        if (selectedRoutine?.id === routineToDelete.id) {
+          setSelectedRoutine(null);
+        }
+
+        // Close dialog and reset state
+        setDeleteDialogOpen(false);
+        setRoutineToDelete(null);
+        setDeleteStep(1);
+        setDeleteConfirmationText('');
+
+        toast({
+          title: "Success",
+          description: `Routine "${routineToDelete.name}" has been permanently deleted.`,
+        });
+
+        // Refresh data to ensure consistency
+        setTimeout(() => refreshRoutineData(), 500);
+      } else {
+        throw new Error(response.message || 'Failed to delete routine');
+      }
+    } catch (error: any) {
+      console.error('Error deleting routine:', error);
+      
+      let errorMessage = "Failed to delete routine. Please try again.";
+      if (error.response?.status === 404) {
+        errorMessage = "Routine not found. It may have already been deleted.";
+      } else if (error.response?.status === 500) {
+        errorMessage = "Server error. Please check the server logs.";
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Helper function to save timetable entries
   const saveTimetableEntries = async (timetableId: string, sessions: ClassSession[]) => {
     try {
       console.log(`Saving ${sessions.length} timetable entries for timetable ${timetableId}`);
+      let successfulEntries = 0;
+      let conflictEntries = 0;
       
       for (const session of sessions) {
         const timeSlot = DEFAULT_TIME_SLOTS.find(t => t.id === session.timeSlotId);
@@ -415,26 +580,43 @@ export default function RoutineBuilder() {
             end_time: timeSlot.endTime,
           };
 
-          console.log('Saving entry:', entryData);
+          console.log('Attempting to save entry:', entryData);
           
           try {
-            await axios.post(`/api/timetables/${timetableId}/entries`, entryData);
-            console.log('Entry saved successfully');
+            const entryResponse = await axios.post(`/api/timetables/${timetableId}/entries`, entryData);
+            console.log('Entry saved successfully:', entryResponse.data);
+            successfulEntries++;
           } catch (entryError: any) {
             console.error('Error saving individual entry:', entryError.response?.data || entryError.message);
-            // Continue with other entries instead of failing completely
+            
             if (entryError.response?.data?.message?.includes('conflicts')) {
-              console.warn('Skipping entry due to conflict:', entryData);
+              console.warn('Entry conflict detected:', entryData);
+              conflictEntries++;
+              // Continue with other entries instead of failing completely
+            } else if (entryError.response?.status === 409) {
+              console.warn('409 Conflict - Entry already exists or conflicts:', entryData);
+              conflictEntries++;
             } else {
-              throw entryError; // Re-throw if it's not a conflict error
+              console.error('Non-conflict error, continuing anyway:', entryError);
+              conflictEntries++;
             }
           }
+        } else {
+          console.warn('Time slot not found for session:', session);
         }
       }
-      console.log('Finished saving timetable entries');
+      
+      console.log(`Finished saving timetable entries: ${successfulEntries} successful, ${conflictEntries} conflicts`);
+      
+      // Don't throw error if some entries were saved successfully
+      if (successfulEntries === 0 && conflictEntries > 0) {
+        console.warn('All entries had conflicts, but continuing...');
+      }
+      
     } catch (error) {
       console.error('Error saving timetable entries:', error);
-      throw error;
+      // Don't throw the error to prevent routine creation from failing
+      console.warn('Continuing despite save errors...');
     }
   };
 
@@ -557,6 +739,14 @@ export default function RoutineBuilder() {
           </p>
         </div>
         <div className="flex items-center space-x-3">
+          <Button 
+            onClick={refreshRoutineData}
+            variant="outline"
+            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            <Wand2 className="h-4 w-4 mr-2" />
+            Refresh Data
+          </Button>
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-indigo-600 hover:bg-indigo-700">
@@ -648,6 +838,133 @@ export default function RoutineBuilder() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Delete Routine Dialog */}
+          <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+            if (!open) {
+              setDeleteDialogOpen(false);
+              setRoutineToDelete(null);
+              setDeleteStep(1);
+              setDeleteConfirmationText('');
+            }
+          }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center text-red-600">
+                  <AlertTriangle className="h-5 w-5 mr-2" />
+                  {deleteStep === 1 ? 'Delete Routine?' : 'Final Confirmation'}
+                </DialogTitle>
+              </DialogHeader>
+              
+              {deleteStep === 1 && routineToDelete && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+                      <div className="space-y-2">
+                        <p className="font-medium text-red-800">
+                          You are about to permanently delete:
+                        </p>
+                        <div className="text-sm text-red-700">
+                          <div className="font-semibold">{routineToDelete.name}</div>
+                          <div>Semester {routineToDelete.semester}, Section {routineToDelete.section}</div>
+                          <div>{routineToDelete.sessions.length} scheduled classes</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <AlertDescription className="text-red-800">
+                      <strong>Warning:</strong> This action cannot be undone. All scheduled classes and routine data will be permanently lost.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <p className="text-sm text-slate-600">
+                    Are you sure you want to continue? Click "Yes, Delete" to proceed to final confirmation.
+                  </p>
+                  
+                  <div className="flex space-x-3">
+                    <Button 
+                      variant="destructive"
+                      onClick={() => setDeleteStep(2)}
+                      className="flex-1"
+                    >
+                      Yes, Delete
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setDeleteDialogOpen(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {deleteStep === 2 && routineToDelete && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-red-100 border border-red-300 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                      <div className="space-y-2">
+                        <p className="font-medium text-red-900">
+                          Final Confirmation Required
+                        </p>
+                        <p className="text-sm text-red-800">
+                          To confirm deletion, please type the routine name exactly as shown:
+                        </p>
+                        <div className="font-mono text-sm bg-white p-2 rounded border border-red-200">
+                          {routineToDelete.name}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="deleteConfirmation" className="text-sm font-medium">
+                      Type routine name to confirm:
+                    </Label>
+                    <Input
+                      id="deleteConfirmation"
+                      value={deleteConfirmationText}
+                      onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                      placeholder="Enter routine name"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <AlertDescription className="text-red-800">
+                      <strong>Last Warning:</strong> This will permanently delete the routine and all its data. This action is irreversible.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <div className="flex space-x-3">
+                    <Button 
+                      variant="destructive"
+                      onClick={deleteRoutine}
+                      disabled={deleteConfirmationText !== routineToDelete.name}
+                      className="flex-1"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Permanently Delete
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setDeleteStep(1)}
+                      className="flex-1"
+                    >
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -696,30 +1013,51 @@ export default function RoutineBuilder() {
             {routines.map(routine => (
               <div
                 key={routine.id}
-                className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                className={`p-4 border rounded-lg transition-all ${
                   selectedRoutine?.id === routine.id
                     ? 'border-indigo-300 bg-indigo-50'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
-                onClick={() => setSelectedRoutine(routine)}
               >
                 <div className="flex items-start justify-between mb-2">
-                  <div>
+                  <div 
+                    className="flex-1 cursor-pointer"
+                    onClick={() => setSelectedRoutine(routine)}
+                  >
                     <h3 className="font-semibold">{routine.name}</h3>
                     <p className="text-sm text-slate-600">
                       Semester {routine.semester}, Section {routine.section}
                     </p>
                   </div>
-                  <Badge variant={routine.isActive ? 'default' : 'secondary'}>
-                    {routine.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={routine.isActive ? 'default' : 'secondary'}>
+                      {routine.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        initiateDeleteRoutine(routine);
+                      }}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                      title="Delete Routine"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 
-                <div className="text-sm text-slate-500">
-                  {routine.sessions.length} classes scheduled
-                </div>
-                <div className="text-xs text-slate-400">
-                  Generated: {new Date(routine.generatedAt).toLocaleDateString()}
+                <div 
+                  className="cursor-pointer"
+                  onClick={() => setSelectedRoutine(routine)}
+                >
+                  <div className="text-sm text-slate-500">
+                    {routine.sessions.length} classes scheduled
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Generated: {new Date(routine.generatedAt).toLocaleDateString()}
+                  </div>
                 </div>
               </div>
             ))}

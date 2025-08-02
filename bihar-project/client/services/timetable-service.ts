@@ -51,7 +51,7 @@ export const TimetableService = {
    */
   getTimetablesByDepartment: async (department: string): Promise<TimetableListResponse> => {
     try {
-      const response = await axios.get<TimetableListResponse>(`${API_URL}/department/${department}`);
+      const response = await axios.get<TimetableListResponse>(`${API_URL}/department/name/${department}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching timetables for department ${department}:`, error);
@@ -115,8 +115,13 @@ export const TimetableService = {
    */
   deleteTimetable: async (id: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await axios.delete<{ success: boolean; message?: string }>(`${API_URL}/${id}`);
-      return response.data;
+      const response = await axios.delete(`${API_URL}/${id}`);
+      // The server returns 204 (No Content) on successful deletion
+      if (response.status === 204 || response.status === 200) {
+        return { success: true };
+      } else {
+        return { success: false, message: 'Failed to delete timetable' };
+      }
     } catch (error) {
       console.error(`Error deleting timetable ${id}:`, error);
       return {
