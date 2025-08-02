@@ -53,6 +53,7 @@ const mapTimeSlotId = (timeSlotId: string): string => {
 export default function Resources() {
   const { currentHOD } = useHODAuth();
   const { toast } = useToast();
+  const [allResources, setAllResources] = useState<Resource[]>([]);
   const [departmentResources, setDepartmentResources] = useState<Resource[]>([]);
   const [universityResources, setUniversityResources] = useState<Resource[]>([]);
   const [selectedDay, setSelectedDay] = useState(1); // Monday
@@ -78,6 +79,13 @@ export default function Resources() {
   });
 
   const [conflicts, setConflicts] = useState<string[]>([]);
+
+  // Helper function to categorize resources by type
+  const categorizeResources = (resources: Resource[]) => {
+    const classrooms = resources.filter(r => r.type === 'classroom');
+    const nonClassrooms = resources.filter(r => r.type !== 'classroom');
+    return { classrooms, nonClassrooms };
+  };
 
   // Manual refresh function to force slot occupancy update
   const refreshSlotOccupancy = () => {
@@ -144,16 +152,49 @@ export default function Resources() {
       
       setLoading(true);
       try {
-        // Load department resources
-        const deptResponse = await ResourceService.getResourcesByDepartment(currentHOD.department);
-        if (deptResponse.success && deptResponse.data) {
-          setDepartmentResources(deptResponse.data);
-        }
+        // Load all resources first
+        const allResourcesResponse = await ResourceService.getAllResources();
+        let allResourcesData: Resource[] = [];
+        
+        if (allResourcesResponse.success && allResourcesResponse.data) {
+          allResourcesData = allResourcesResponse.data;
+          setAllResources(allResourcesData);
+          
+          console.log('Current HOD department:', currentHOD.department);
+          console.log('All resources data:', allResourcesData.map(r => ({ id: r.id, name: r.name, department: r.department })));
+          
+          // Categorize resources based on department
+          const deptResources = allResourcesData.filter(r => 
+            r.department === currentHOD.department
+          );
+          const uniResources = allResourcesData.filter(r => 
+            r.department !== currentHOD.department
+          );
+          
+          console.log('Department resources:', deptResources.map(r => ({ id: r.id, name: r.name, department: r.department })));
+          console.log('University resources:', uniResources.map(r => ({ id: r.id, name: r.name, department: r.department })));
+          
+          setDepartmentResources(deptResources);
+          setUniversityResources(uniResources);
+        } else {
+          // Fallback to the old method if getAllResources doesn't work
+          console.warn('getAllResources failed, falling back to separate calls');
+          
+          // Load department resources
+          const deptResponse = await ResourceService.getResourcesByDepartment(currentHOD.department);
+          if (deptResponse.success && deptResponse.data) {
+            setDepartmentResources(deptResponse.data);
+            allResourcesData.push(...deptResponse.data);
+          }
 
-        // Load shared university resources
-        const sharedResponse = await ResourceService.getSharedResources();
-        if (sharedResponse.success && sharedResponse.data) {
-          setUniversityResources(sharedResponse.data);
+          // Load shared university resources
+          const sharedResponse = await ResourceService.getSharedResources();
+          if (sharedResponse.success && sharedResponse.data) {
+            setUniversityResources(sharedResponse.data);
+            allResourcesData.push(...sharedResponse.data);
+          }
+          
+          setAllResources(allResourcesData);
         }
 
         // Load booking requests
@@ -169,11 +210,7 @@ export default function Resources() {
         }
 
         // Generate weekly slots for all resources
-        const allResources = [
-          ...(deptResponse.data || []),
-          ...(sharedResponse.data || [])
-        ];
-        generateWeeklySlots(allResources);
+        generateWeeklySlots(allResourcesData);
 
         // Force slot occupancy update after a brief delay to ensure slots are generated
         setTimeout(() => {
@@ -405,16 +442,8 @@ export default function Resources() {
     }
   };
 
-  const ResourceGrid = ({ resources, title, isShared = false }: { 
-    resources: Resource[], 
-    title: string, 
-    isShared?: boolean 
-  }) => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-slate-900 flex items-center">
-        {isShared && <Globe className="h-5 w-5 mr-2 text-blue-500" />}
-        {title}
-      </h3>
+  const ResourceGrid = ({ resources }: { resources: Resource[] }) => {
+    return (
       <div className="grid gap-6">
         {resources.map((resource) => (
           <Card key={resource.id}>
@@ -493,8 +522,57 @@ export default function Resources() {
           </Card>
         ))}
       </div>
-    </div>
-  );
+    );
+  };
+
+  const ResourceCategory = ({ resources, title, isShared = false }: { 
+    resources: Resource[], 
+    title: string, 
+    isShared?: boolean 
+  }) => {
+    const { classrooms, nonClassrooms } = categorizeResources(resources);
+    
+    return (
+      <div className="space-y-8">
+        <h2 className="text-xl font-bold text-slate-900 flex items-center">
+          {isShared && <Globe className="h-5 w-5 mr-2 text-blue-500" />}
+          {title}
+        </h2>
+        
+        {/* Classrooms Section */}
+        {classrooms.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Building2 className="h-5 w-5 text-indigo-500" />
+              <h3 className="text-lg font-semibold text-slate-900">
+                Classrooms ({classrooms.length})
+              </h3>
+            </div>
+            <ResourceGrid resources={classrooms} />
+          </div>
+        )}
+        
+        {/* Non-Classrooms Section */}
+        {nonClassrooms.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Building2 className="h-5 w-5 text-green-500" />
+              <h3 className="text-lg font-semibold text-slate-900">
+                Labs & Special Facilities ({nonClassrooms.length})
+              </h3>
+            </div>
+            <ResourceGrid resources={nonClassrooms} />
+          </div>
+        )}
+        
+        {resources.length === 0 && (
+          <div className="text-center py-8 text-slate-500">
+            No resources available in this category
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -571,16 +649,16 @@ export default function Resources() {
         </TabsList>
         
         <TabsContent value="department">
-          <ResourceGrid 
+          <ResourceCategory 
             resources={departmentResources} 
             title={`${currentHOD?.department} Resources`}
           />
         </TabsContent>
         
         <TabsContent value="university">
-          <ResourceGrid 
+          <ResourceCategory 
             resources={universityResources} 
-            title="Shared University Resources"
+            title="Other University Resources"
             isShared={true}
           />
         </TabsContent>

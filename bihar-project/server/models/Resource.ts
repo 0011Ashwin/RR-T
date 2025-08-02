@@ -19,10 +19,20 @@ export interface Resource {
 export class ResourceModel {
   static async getAll() {
     return db('resources')
-      .select('*')
+      .join('departments', 'resources.department_id', 'departments.id')
+      .select('resources.*', 'departments.name as department_name')
       .then(resources => {
         return resources.map(resource => ({
           ...resource,
+          id: resource.id,
+          name: resource.name,
+          type: resource.type,
+          department: resource.department_name,
+          capacity: resource.capacity,
+          description: resource.description,
+          location: resource.location,
+          isShared: resource.is_shared,
+          isActive: resource.is_active,
           equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
           facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
         }));
