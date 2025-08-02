@@ -26,6 +26,13 @@ import {
   Search
 } from 'lucide-react';
 
+// Helper function to filter out internal data from notes
+const filterInternalData = (notes: string): string => {
+  if (!notes) return '';
+  // Remove anything between [INTERNAL_DATA] and [/INTERNAL_DATA] tags
+  return notes.replace(/\[INTERNAL_DATA\].*?\[\/INTERNAL_DATA\]/g, '').trim();
+};
+
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function BookingRequests() {
@@ -280,10 +287,10 @@ export default function BookingRequests() {
                           Requested: {new Date(request.requestDate).toLocaleString()}
                         </div>
 
-                        {request.notes && (
+                        {request.notes && filterInternalData(request.notes) && (
                           <div className="mt-3 p-3 bg-slate-50 rounded-lg">
                             <div className="text-sm font-medium text-slate-700 mb-1">Response Notes:</div>
-                            <div className="text-sm text-slate-600">{request.notes}</div>
+                            <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
                           </div>
                         )}
                       </div>
@@ -384,10 +391,10 @@ export default function BookingRequests() {
                           )}
                         </div>
 
-                        {request.notes && (
+                        {request.notes && filterInternalData(request.notes) && (
                           <div className="mt-3 p-3 bg-slate-50 rounded-lg">
                             <div className="text-sm font-medium text-slate-700 mb-1">Response Notes:</div>
-                            <div className="text-sm text-slate-600">{request.notes}</div>
+                            <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
                           </div>
                         )}
                       </div>

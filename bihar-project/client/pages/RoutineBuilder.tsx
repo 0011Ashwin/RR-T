@@ -52,6 +52,7 @@ export default function RoutineBuilder() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addSessionDialogOpen, setAddSessionDialogOpen] = useState(false);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [routineToDelete, setRoutineToDelete] = useState<Routine | null>(null);
   const [routineToEdit, setRoutineToEdit] = useState<Routine | null>(null);
@@ -61,6 +62,8 @@ export default function RoutineBuilder() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [faculty, setFaculty] = useState<any[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-render when this changes
+  const [bookingRequests, setBookingRequests] = useState<any[]>([]); // Pending booking requests
 
   const [newRoutineForm, setNewRoutineForm] = useState({
     name: '',
@@ -87,6 +90,19 @@ export default function RoutineBuilder() {
   });
 
   // Manual refresh function to force routine data update
+  // Memoized current routine that always reflects the latest data from routines array
+  const currentRoutine = useMemo(() => {
+    if (!selectedRoutine) return null;
+    const latestRoutine = routines.find(r => r.id === selectedRoutine.id) || selectedRoutine;
+    console.log('currentRoutine updated:', {
+      selectedRoutineId: selectedRoutine.id,
+      selectedRoutineSessions: selectedRoutine.sessions.length,
+      latestRoutineSessions: latestRoutine.sessions.length,
+      routinesCount: routines.length
+    });
+    return latestRoutine;
+  }, [selectedRoutine, routines]);
+
   const refreshRoutineData = async () => {
     if (!currentHOD) return;
     
@@ -105,26 +121,46 @@ export default function RoutineBuilder() {
           section: rt.section || 'A',
           academicYear: rt.academic_year || '2024-25',
           numberOfStudents: rt.number_of_students || 0,
-          sessions: rt.entries ? rt.entries.map((entry: any) => ({
-            id: entry.id.toString(),
-            courseId: entry.subject_id.toString(),
-            resourceId: entry.classroom_id.toString(),
-            faculty: entry.faculty_name || entry.faculty_id.toString(),
-            dayOfWeek: entry.day_of_week,
-            timeSlotId: DEFAULT_TIME_SLOTS.find(t => 
+          sessions: rt.entries ? rt.entries.map((entry: any) => {
+            const matchingTimeSlot = DEFAULT_TIME_SLOTS.find(t => 
               t.startTime === entry.start_time && t.endTime === entry.end_time
-            )?.id || '1',
-            type: 'theory',
-          })) : [],
+            );
+            console.log(`Mapping entry ${entry.id}: ${entry.start_time}-${entry.end_time} to timeSlot:`, matchingTimeSlot);
+            
+            const session = {
+              id: entry.id.toString(),
+              courseId: entry.subject_id.toString(),
+              resourceId: entry.classroom_id.toString(),
+              faculty: entry.faculty_name || entry.faculty_id.toString(),
+              dayOfWeek: entry.day_of_week,
+              timeSlotId: matchingTimeSlot?.id || '1',
+              type: 'theory' as const,
+            };
+            console.log('Created session object:', session);
+            return session;
+          }) : [],
           generatedBy: currentHOD.name,
           generatedAt: rt.created_at || new Date().toISOString(),
           isActive: rt.is_active !== false,
           version: 1,
         }));
         
-        console.log('Fetched routines:', fetchedRoutines);
+        console.log('Fetched routines with sessions:', fetchedRoutines);
         setRoutines(fetchedRoutines);
+        
+        // Update selectedRoutine to reflect the new data if one is currently selected
+        if (selectedRoutine) {
+          const updatedSelectedRoutine = fetchedRoutines.find(r => r.id === selectedRoutine.id);
+          if (updatedSelectedRoutine) {
+            console.log('Updating selectedRoutine with fresh data:', updatedSelectedRoutine);
+            setSelectedRoutine(updatedSelectedRoutine);
+          }
+        }
+        
         updateRoutineViews(fetchedRoutines);
+        
+        // Force re-render
+        setRefreshKey(prev => prev + 1);
         
         toast({
           title: "Success",
@@ -222,10 +258,49 @@ export default function RoutineBuilder() {
       }
     };
 
+    const fetchBookingRequests = async () => {
+      try {
+        // Fetch pending booking requests made by current HOD's department
+        const response = await axios.get(`/api/booking-requests/requester/${currentHOD.department}`);
+        if (response.data.success && response.data.data) {
+          setBookingRequests(response.data.data.filter((req: any) => req.status === 'pending'));
+          console.log('Fetched pending booking requests:', response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching booking requests:', error);
+      }
+    };
+
     fetchRoutines();
     fetchResources();
     fetchCourses();
+    fetchBookingRequests();
   }, [currentHOD, toast]);
+
+  // Listen for window focus to refresh data when user returns from other pages
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('Window focused - refreshing routine data');
+      if (currentHOD) {
+        refreshRoutineData();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && currentHOD) {
+        console.log('Page became visible - refreshing routine data');
+        refreshRoutineData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentHOD]);
 
   useEffect(() => {
     updateRoutineViews(routines);
@@ -324,9 +399,12 @@ export default function RoutineBuilder() {
   };
 
   const updateRoutineViews = (routines: Routine[]) => {
+    console.log('updateRoutineViews called with routines:', routines);
     const views: RoutineView[] = [];
     
     routines.forEach(routine => {
+      console.log(`Processing routine ${routine.id} with ${routine.sessions.length} sessions:`, routine.sessions);
+      
       // Group sessions by course
       const courseGroups = new Map<string, ClassSession[]>();
       
@@ -339,16 +417,20 @@ export default function RoutineBuilder() {
 
       courseGroups.forEach((sessions, courseId) => {
         const course = courses.find(c => c.id === courseId);
-        if (course) {
-          views.push({
-            semester: routine.semester,
-            section: routine.section || 'A',
-            sessions,
-          });
-        }
+        console.log(`Course group ${courseId}:`, { course: course?.name, sessionsCount: sessions.length });
+        
+        // Always add the view, even if course isn't found in the courses array
+        // This ensures sessions are visible immediately after creation
+        views.push({
+          semester: routine.semester,
+          section: routine.section || 'A',
+          sessions,
+          course, // This might be undefined for newly created courses
+        });
       });
     });
     
+    console.log('Generated routine views:', views);
     setRoutineViews(views);
   };
 
@@ -574,6 +656,8 @@ export default function RoutineBuilder() {
       return;
     }
 
+    if (isCreatingSession) return; // Prevent multiple concurrent creations
+
     if (!addSessionForm.subjectName || !addSessionForm.resourceId || !addSessionForm.facultyId) {
       toast({
         title: "Error",
@@ -583,6 +667,7 @@ export default function RoutineBuilder() {
       return;
     }
 
+    setIsCreatingSession(true);
     try {
       // Check if the selected resource belongs to another department
       const selectedResource = resources.find(r => r.id?.toString() === addSessionForm.resourceId);
@@ -613,7 +698,13 @@ export default function RoutineBuilder() {
       console.error('Error saving session:', error);
       
       let errorMessage = "Failed to save session. Please try again.";
-      if (error.message) {
+      
+      // Check for detailed axios error response (for conflict messages)
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 409) {
+        errorMessage = "Schedule conflict detected. Please choose a different time or resource.";
+      } else if (error.message) {
         errorMessage = error.message;
       }
       
@@ -622,6 +713,8 @@ export default function RoutineBuilder() {
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsCreatingSession(false);
     }
   };
 
@@ -645,6 +738,14 @@ export default function RoutineBuilder() {
       expectedAttendance: selectedRoutine.numberOfStudents || 0,
       requestDate: new Date().toISOString(),
       status: 'pending',
+      // Additional fields needed for timetable entry creation
+      timetableId: selectedRoutine.id,
+      subjectName: addSessionForm.subjectName,
+      subjectCode: addSessionForm.subjectCode || addSessionForm.subjectName.toLowerCase().replace(/\s+/g, ''),
+      facultyId: addSessionForm.facultyId,
+      sessionType: addSessionForm.type,
+      startTime: timeSlot.startTime,
+      endTime: timeSlot.endTime,
     };
 
     // Send booking request via API
@@ -652,6 +753,17 @@ export default function RoutineBuilder() {
     
     if (response.data.success) {
       setAddSessionDialogOpen(false);
+      
+      // Refresh booking requests to show the new pending request
+      try {
+        const bookingResponse = await axios.get(`/api/booking-requests/requester/${currentHOD.department}`);
+        if (bookingResponse.data.success && bookingResponse.data.data) {
+          setBookingRequests(bookingResponse.data.data.filter((req: any) => req.status === 'pending'));
+        }
+      } catch (error) {
+        console.error('Error refreshing booking requests:', error);
+      }
+      
       toast({
         title: "Booking Request Sent",
         description: `A booking request has been sent to ${resource.department} department for approval.`,
@@ -691,6 +803,27 @@ export default function RoutineBuilder() {
       const subjectResponse = await axios.post('/api/subjects', subjectData);
       if (subjectResponse.data.success) {
         subjectId = subjectResponse.data.data.id;
+        
+        // Refresh courses after creating new subject
+        try {
+          const coursesResponse = await axios.get('/api/subjects');
+          const coursesData = coursesResponse.data.map((subject: any) => ({
+            id: subject.id.toString(),
+            name: subject.name,
+            code: subject.code,
+            department: currentHOD.department,
+            semester: subject.semester || 1,
+            section: subject.section || 'A',
+            faculty: subject.faculty_name || 'TBD',
+            type: subject.type || 'theory',
+            weeklyHours: subject.weekly_hours || 3,
+            expectedSize: subject.expected_size || 30,
+          }));
+          setCourses(coursesData);
+          console.log('Courses refreshed after creating new subject');
+        } catch (error) {
+          console.error('Error refreshing courses after creating subject:', error);
+        }
       } else {
         throw new Error(subjectResponse.data.message || "Failed to create subject");
       }
@@ -706,19 +839,36 @@ export default function RoutineBuilder() {
       end_time: timeSlot.endTime,
     };
 
-    const entryResponse = await axios.post(`/api/timetables/${selectedRoutine.id}/entries`, entryData);
-    
-    if (entryResponse.data.success) {
-      setAddSessionDialogOpen(false);
-      toast({
-        title: "Success",
-        description: "Session added successfully!",
-      });
+    console.log('Creating timetable entry with data:', entryData);
+    console.log('Posting to URL:', `/api/timetables/${selectedRoutine.id}/entries`);
 
-      // Refresh routine data
-      setTimeout(() => refreshRoutineData(), 500);
-    } else {
-      throw new Error(entryResponse.data.message || "Failed to create session");
+    try {
+      const entryResponse = await axios.post(`/api/timetables/${selectedRoutine.id}/entries`, entryData);
+      console.log('Entry creation response:', entryResponse.data);
+      
+      if (entryResponse.data.success) {
+        setAddSessionDialogOpen(false);
+        
+        // Immediate refresh without delay
+        await refreshRoutineData();
+        
+        toast({
+          title: "Success",
+          description: "Session added successfully!",
+        });
+      } else {
+        throw new Error(entryResponse.data.message || "Failed to create session");
+      }
+    } catch (axiosError: any) {
+      // Handle axios errors (409, 400, 500, etc.)
+      if (axiosError.response?.data?.message) {
+        // Use the detailed error message from the server
+        throw new Error(axiosError.response.data.message);
+      } else if (axiosError.response?.status === 409) {
+        throw new Error("Schedule conflict detected. Please choose a different time or resource.");
+      } else {
+        throw new Error(axiosError.message || "Failed to create session");
+      }
     }
   };
 
@@ -1589,15 +1739,25 @@ export default function RoutineBuilder() {
                 <div className="flex space-x-3">
                   <Button 
                     onClick={saveNewSession}
-                    disabled={!addSessionForm.subjectName || !addSessionForm.resourceId || !addSessionForm.facultyId}
+                    disabled={!addSessionForm.subjectName || !addSessionForm.resourceId || !addSessionForm.facultyId || isCreatingSession}
                     className="flex-1"
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Add Session
+                    {isCreatingSession ? (
+                      <>
+                        <Clock className="h-4 w-4 mr-2 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Add Session
+                      </>
+                    )}
                   </Button>
                   <Button 
                     variant="outline" 
                     onClick={() => setAddSessionDialogOpen(false)}
+                    disabled={isCreatingSession}
                     className="flex-1"
                   >
                     Cancel
@@ -1719,11 +1879,11 @@ export default function RoutineBuilder() {
       </Card>
 
       {/* Routine Display */}
-      {selectedRoutine && (
+      {currentRoutine && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>{selectedRoutine.name}</CardTitle>
+              <CardTitle>{currentRoutine.name}</CardTitle>
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -1753,7 +1913,7 @@ export default function RoutineBuilder() {
               
               <TabsContent value="weekly" className="space-y-4">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-slate-200">
+                  <table key={`${currentRoutine.id}-${currentRoutine.sessions.length}-${refreshKey}`} className="w-full border-collapse border border-slate-200">
                     <thead>
                       <tr className="bg-slate-50">
                         <th className="border border-slate-200 p-3 text-left">Time</th>
@@ -1771,10 +1931,15 @@ export default function RoutineBuilder() {
                             {timeSlot.label}
                           </td>
                           {[1, 2, 3, 4, 5].map(day => {
-                            const session = selectedRoutine.sessions.find(s =>
+                            const session = currentRoutine.sessions.find(s =>
                               s.timeSlotId === timeSlot.id && s.dayOfWeek === day
                             );
                             const course = session ? courses.find(c => c.id === session.courseId) : null;
+                            
+                            // Check for pending booking requests for this time slot
+                            const pendingRequest = bookingRequests.find(req =>
+                              req.timeSlotId === timeSlot.id && req.dayOfWeek === day
+                            );
                             
                             return (
                               <td key={day} className="border border-slate-200 p-3">
@@ -1788,6 +1953,15 @@ export default function RoutineBuilder() {
                                     </div>
                                     <Badge variant="outline" className="text-xs">
                                       {session.type}
+                                    </Badge>
+                                  </div>
+                                ) : pendingRequest ? (
+                                  <div className="space-y-1 bg-yellow-50 p-2 rounded border border-yellow-200">
+                                    <div className="font-medium text-sm text-yellow-800">{pendingRequest.courseName}</div>
+                                    <div className="text-xs text-yellow-600">{pendingRequest.purpose}</div>
+                                    <div className="text-xs text-yellow-600">Request to: {pendingRequest.targetDepartment}</div>
+                                    <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
+                                      Pending Approval
                                     </Badge>
                                   </div>
                                 ) : (

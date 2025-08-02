@@ -80,12 +80,23 @@ router.get('/department/name/:department', async (req, res) => {
             'classrooms.name as classroom_name',
             'classrooms.room_number as classroom_room_number'
           );
+
+        // Process entries to ensure proper time format
+        const processedEntries = entries.map(entry => ({
+          ...entry,
+          start_time: typeof entry.start_time === 'string' && entry.start_time.includes(' ') 
+            ? entry.start_time.split(' ')[1].substring(0, 5) // Extract HH:MM from "YYYY-MM-DD HH:MM:SS"
+            : entry.start_time,
+          end_time: typeof entry.end_time === 'string' && entry.end_time.includes(' ')
+            ? entry.end_time.split(' ')[1].substring(0, 5) // Extract HH:MM from "YYYY-MM-DD HH:MM:SS"
+            : entry.end_time
+        }));
         
         return {
           ...timetable,
           academicYear: timetable.academic_year,
           numberOfStudents: timetable.number_of_students,
-          entries,
+          entries: processedEntries,
         };
       })
     );
@@ -215,10 +226,34 @@ router.post('/:id/entries', async (req, res) => {
     const entry = { ...req.body, timetable_id: timetableId };
     
     const newEntry = await TimetableModel.addEntry(entry);
-    res.status(201).json(newEntry);
+    res.status(201).json({
+      success: true,
+      data: newEntry,
+      message: 'Timetable entry added successfully'
+    });
   } catch (error) {
     console.error('Error adding timetable entry:', error);
-    res.status(500).json({ error: 'Failed to add timetable entry', message: error.message });
+    
+    // Check if it's a conflict error
+    if (error.message && error.message.includes('Cannot create session due to conflicts')) {
+      res.status(409).json({ 
+        success: false,
+        error: 'Schedule conflict', 
+        message: error.message 
+      });
+    } else if (error.message && error.message.includes('Missing required fields')) {
+      res.status(400).json({ 
+        success: false,
+        error: 'Invalid request', 
+        message: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to add timetable entry', 
+        message: error.message 
+      });
+    }
   }
 });
 
@@ -232,7 +267,21 @@ router.put('/entries/:entryId', async (req, res) => {
     res.json(updatedEntry);
   } catch (error) {
     console.error('Error updating timetable entry:', error);
-    res.status(500).json({ error: 'Failed to update timetable entry', message: error.message });
+    
+    // Check if it's a conflict error
+    if (error.message && error.message.includes('Cannot update session due to conflicts')) {
+      res.status(409).json({ 
+        success: false,
+        error: 'Schedule conflict', 
+        message: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to update timetable entry', 
+        message: error.message 
+      });
+    }
   }
 });
 
