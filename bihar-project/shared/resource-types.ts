@@ -111,6 +111,7 @@ export interface Routine {
   semester: number;
   section?: string;
   academicYear: string;
+  numberOfStudents?: number;
   sessions: ClassSession[];
   generatedBy: string; // HOD user ID
   generatedAt: string;

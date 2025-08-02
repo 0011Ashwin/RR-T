@@ -28,7 +28,8 @@ import {
   User,
   BookOpen,
   Filter,
-  Trash2
+  Trash2,
+  Edit3
 } from 'lucide-react';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -49,18 +50,40 @@ export default function RoutineBuilder() {
   const [selectedSemester, setSelectedSemester] = useState<number>(1);
   const [selectedSection, setSelectedSection] = useState<string>('A');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addSessionDialogOpen, setAddSessionDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [routineToDelete, setRoutineToDelete] = useState<Routine | null>(null);
+  const [routineToEdit, setRoutineToEdit] = useState<Routine | null>(null);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<{timeSlotId: string, dayOfWeek: number} | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [resources, setResources] = useState<Resource[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [faculty, setFaculty] = useState<any[]>([]);
 
   const [newRoutineForm, setNewRoutineForm] = useState({
     name: '',
     semester: 1,
     section: 'A',
     academicYear: '2024-25',
+    numberOfStudents: 45,
+  });
+
+  const [editRoutineForm, setEditRoutineForm] = useState({
+    name: '',
+    semester: 1,
+    section: 'A',
+    academicYear: '2024-25',
+    numberOfStudents: 45,
+  });
+
+  const [addSessionForm, setAddSessionForm] = useState({
+    subjectName: '',
+    subjectCode: '',
+    resourceId: '',
+    facultyId: '',
+    type: 'theory' as 'theory' | 'practical' | 'tutorial' | 'seminar',
   });
 
   // Manual refresh function to force routine data update
@@ -81,6 +104,7 @@ export default function RoutineBuilder() {
           semester: rt.semester,
           section: rt.section || 'A',
           academicYear: rt.academic_year || '2024-25',
+          numberOfStudents: rt.number_of_students || 0,
           sessions: rt.entries ? rt.entries.map((entry: any) => ({
             id: entry.id.toString(),
             courseId: entry.subject_id.toString(),
@@ -206,6 +230,33 @@ export default function RoutineBuilder() {
   useEffect(() => {
     updateRoutineViews(routines);
   }, [routines, courses, resources]);
+
+  // Load faculty and resources data
+  useEffect(() => {
+    const loadFacultyAndResources = async () => {
+      if (!currentHOD) return;
+
+      try {
+        // Load faculty from the same department
+        const facultyResponse = await axios.get(`/api/faculty/department/name/${currentHOD.department}`);
+        console.log('Faculty response:', facultyResponse.data);
+        if (facultyResponse.data.success) {
+          setFaculty(facultyResponse.data.data);
+          console.log('Faculty loaded:', facultyResponse.data.data);
+        }
+
+        // Load resources
+        const resourcesResponse = await ResourceService.getAllResources();
+        if (resourcesResponse.success && resourcesResponse.data) {
+          setResources(resourcesResponse.data);
+        }
+      } catch (error) {
+        console.error('Error loading faculty and resources:', error);
+      }
+    };
+
+    loadFacultyAndResources();
+  }, [currentHOD]);
 
   // Force refresh when component becomes visible (tab switch)
   useEffect(() => {
@@ -394,6 +445,7 @@ export default function RoutineBuilder() {
         semester: newRoutineForm.semester,
         section: newRoutineForm.section,
         academicYear: newRoutineForm.academicYear, // Keep camelCase for API interface
+        numberOfStudents: newRoutineForm.numberOfStudents,
         sessions: [], // Always start with empty sessions to avoid conflicts
       };
 
@@ -411,6 +463,7 @@ export default function RoutineBuilder() {
           semester: response.data.semester,
           section: response.data.section || 'A',
           academicYear: response.data.academicYear || (response.data as any).academic_year || '2024-25', // Handle both camelCase and snake_case
+          numberOfStudents: response.data.numberOfStudents || newRoutineForm.numberOfStudents,
           sessions: [], // Start with empty sessions
           generatedBy: currentHOD.name,
           generatedAt: new Date().toISOString(),
@@ -447,6 +500,7 @@ export default function RoutineBuilder() {
           semester: 1,
           section: 'A',
           academicYear: '2024-25',
+          numberOfStudents: 45,
         });
 
         const sessionMessage = successfulSessions.length > 0 
@@ -482,6 +536,289 @@ export default function RoutineBuilder() {
         errorMessage = error.response.data.message;
       } else if (error.message.includes('Network Error')) {
         errorMessage = "Cannot connect to server. Please ensure the server is running.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Function to initiate adding a session to a time slot
+  const initiateAddSession = (timeSlotId: string, dayOfWeek: number) => {
+    if (!selectedRoutine) return;
+    
+    setSelectedTimeSlot({ timeSlotId, dayOfWeek });
+    setAddSessionForm({
+      subjectName: '',
+      subjectCode: '',
+      resourceId: '',
+      facultyId: '',
+      type: 'theory',
+    });
+    setAddSessionDialogOpen(true);
+  };
+
+  // Function to save a new session
+  const saveNewSession = async () => {
+    if (!selectedRoutine || !selectedTimeSlot || !currentHOD) {
+      toast({
+        title: "Error",
+        description: "Missing required information.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!addSessionForm.subjectName || !addSessionForm.resourceId || !addSessionForm.facultyId) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Check if the selected resource belongs to another department
+      const selectedResource = resources.find(r => r.id?.toString() === addSessionForm.resourceId);
+      if (!selectedResource) {
+        throw new Error("Selected resource not found");
+      }
+
+      // Check capacity warning
+      const routineStudents = selectedRoutine.numberOfStudents || 0;
+      if (selectedResource.capacity < routineStudents) {
+        const confirmed = window.confirm(
+          `Warning: The selected resource has capacity for ${selectedResource.capacity} students, but this routine has ${routineStudents} students. Do you want to proceed anyway?`
+        );
+        if (!confirmed) return;
+      }
+
+      // Check if resource belongs to different department
+      if (selectedResource.department !== currentHOD.department) {
+        // This should send a booking request instead of directly creating
+        await createBookingRequest(selectedResource);
+        return;
+      }
+
+      // Create the session directly if resource belongs to same department
+      await createDirectSession();
+
+    } catch (error: any) {
+      console.error('Error saving session:', error);
+      
+      let errorMessage = "Failed to save session. Please try again.";
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Function to create a booking request for cross-department resource
+  const createBookingRequest = async (resource: Resource) => {
+    if (!selectedRoutine || !selectedTimeSlot || !currentHOD) return;
+
+    const timeSlot = DEFAULT_TIME_SLOTS.find(t => t.id === selectedTimeSlot.timeSlotId);
+    if (!timeSlot) throw new Error("Time slot not found");
+
+    const bookingRequest = {
+      id: Date.now().toString(),
+      requesterId: currentHOD.id,
+      requesterDepartment: currentHOD.department,
+      targetResourceId: resource.id?.toString() || '',
+      targetDepartment: resource.department,
+      timeSlotId: selectedTimeSlot.timeSlotId,
+      dayOfWeek: selectedTimeSlot.dayOfWeek,
+      courseName: addSessionForm.subjectName,
+      purpose: `${addSessionForm.type} session`,
+      expectedAttendance: selectedRoutine.numberOfStudents || 0,
+      requestDate: new Date().toISOString(),
+      status: 'pending',
+    };
+
+    // Send booking request via API
+    const response = await axios.post('/api/booking-requests', bookingRequest);
+    
+    if (response.data.success) {
+      setAddSessionDialogOpen(false);
+      toast({
+        title: "Booking Request Sent",
+        description: `A booking request has been sent to ${resource.department} department for approval.`,
+      });
+    } else {
+      throw new Error(response.data.message || "Failed to send booking request");
+    }
+  };
+
+  // Function to create a session directly (same department resource)
+  const createDirectSession = async () => {
+    if (!selectedRoutine || !selectedTimeSlot || !currentHOD) return;
+
+    const timeSlot = DEFAULT_TIME_SLOTS.find(t => t.id === selectedTimeSlot.timeSlotId);
+    if (!timeSlot) throw new Error("Time slot not found");
+
+    // First, try to find existing subject by code or create new one
+    const subjectCode = addSessionForm.subjectCode || addSessionForm.subjectName.substring(0, 6).toUpperCase().replace(/\s+/g, '');
+    
+    let subjectId;
+    try {
+      // Try to find existing subject by code
+      const existingSubjectResponse = await axios.get(`/api/subjects/code/${subjectCode}`);
+      if (existingSubjectResponse.data) {
+        subjectId = existingSubjectResponse.data.id;
+      }
+    } catch (error) {
+      // Subject doesn't exist, create new one
+      const subjectData = {
+        name: addSessionForm.subjectName,
+        code: subjectCode,
+        credits: addSessionForm.type === 'practical' ? 2 : 3,
+        type: addSessionForm.type === 'practical' ? 'practical' : 'lecture',
+        department: currentHOD.department,
+      };
+
+      const subjectResponse = await axios.post('/api/subjects', subjectData);
+      if (subjectResponse.data.success) {
+        subjectId = subjectResponse.data.data.id;
+      } else {
+        throw new Error(subjectResponse.data.message || "Failed to create subject");
+      }
+    }
+
+    // Create the timetable entry
+    const entryData = {
+      subject_id: subjectId,
+      faculty_id: parseInt(addSessionForm.facultyId),
+      classroom_id: parseInt(addSessionForm.resourceId),
+      day_of_week: selectedTimeSlot.dayOfWeek,
+      start_time: timeSlot.startTime,
+      end_time: timeSlot.endTime,
+    };
+
+    const entryResponse = await axios.post(`/api/timetables/${selectedRoutine.id}/entries`, entryData);
+    
+    if (entryResponse.data.success) {
+      setAddSessionDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Session added successfully!",
+      });
+
+      // Refresh routine data
+      setTimeout(() => refreshRoutineData(), 500);
+    } else {
+      throw new Error(entryResponse.data.message || "Failed to create session");
+    }
+  };
+
+  // Function to check if a resource is available at the selected time slot
+  const isResourceAvailable = (resourceId: string) => {
+    if (!selectedTimeSlot || !selectedRoutine) return true;
+    
+    // Check if any routine has a session at this time slot using this resource
+    return !routines.some(routine => 
+      routine.sessions.some(session => 
+        session.resourceId === resourceId &&
+        session.timeSlotId === selectedTimeSlot.timeSlotId &&
+        session.dayOfWeek === selectedTimeSlot.dayOfWeek &&
+        routine.id !== selectedRoutine.id // Exclude current routine
+      )
+    );
+  };
+
+  // Function to initiate routine editing
+  const initiateEditRoutine = (routine: Routine) => {
+    setRoutineToEdit(routine);
+    setEditRoutineForm({
+      name: routine.name,
+      semester: routine.semester,
+      section: routine.section || 'A',
+      academicYear: routine.academicYear,
+      numberOfStudents: routine.numberOfStudents || 45,
+    });
+    setEditDialogOpen(true);
+  };
+
+  // Function to save routine edits
+  const saveRoutineEdits = async () => {
+    if (!routineToEdit || !currentHOD) {
+      toast({
+        title: "Error",
+        description: "Missing routine or HOD information.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!editRoutineForm.name || !editRoutineForm.academicYear) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Update timetable via API
+      const updateData = {
+        id: routineToEdit.id,
+        name: editRoutineForm.name,
+        semester: editRoutineForm.semester,
+        section: editRoutineForm.section,
+        academicYear: editRoutineForm.academicYear,
+        numberOfStudents: editRoutineForm.numberOfStudents,
+      };
+
+      const response = await TimetableService.updateTimetable(updateData);
+      
+      if (response.success) {
+        // Update local state
+        const updatedRoutines = routines.map(r => 
+          r.id === routineToEdit.id 
+            ? {
+                ...r,
+                name: editRoutineForm.name,
+                semester: editRoutineForm.semester,
+                section: editRoutineForm.section,
+                academicYear: editRoutineForm.academicYear,
+                numberOfStudents: editRoutineForm.numberOfStudents,
+              }
+            : r
+        );
+        
+        setRoutines(updatedRoutines);
+        updateRoutineViews(updatedRoutines);
+        setEditDialogOpen(false);
+        setRoutineToEdit(null);
+
+        toast({
+          title: "Success",
+          description: "Routine updated successfully!",
+        });
+
+        // Refresh data from database to ensure consistency
+        setTimeout(() => refreshRoutineData(), 500);
+      } else {
+        throw new Error(response.message || "Failed to update routine");
+      }
+    } catch (error: any) {
+      console.error('Error updating routine:', error);
+      
+      let errorMessage = "Failed to update routine. Please try again.";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -818,6 +1155,19 @@ export default function RoutineBuilder() {
                   />
                 </div>
                 
+                <div>
+                  <Label htmlFor="numberOfStudents">Number of Students</Label>
+                  <Input
+                    id="numberOfStudents"
+                    type="number"
+                    value={newRoutineForm.numberOfStudents}
+                    onChange={(e) => setNewRoutineForm(prev => ({ ...prev, numberOfStudents: parseInt(e.target.value) || 0 }))}
+                    placeholder="e.g., 45"
+                    min="1"
+                    max="200"
+                  />
+                </div>
+                
                 <div className="flex space-x-3">
                   <Button 
                     onClick={createNewRoutine}
@@ -965,6 +1315,297 @@ export default function RoutineBuilder() {
               )}
             </DialogContent>
           </Dialog>
+
+          {/* Edit Routine Dialog */}
+          <Dialog open={editDialogOpen} onOpenChange={(open) => {
+            if (!open) {
+              setEditDialogOpen(false);
+              setRoutineToEdit(null);
+            }
+          }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center text-blue-600">
+                  <Edit3 className="h-5 w-5 mr-2" />
+                  Edit Routine
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editRoutineName">Routine Name *</Label>
+                  <Input
+                    id="editRoutineName"
+                    value={editRoutineForm.name}
+                    onChange={(e) => setEditRoutineForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., BCA, BBA, Geography, Mathematics"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="editSemester">Semester</Label>
+                    <Select
+                      value={editRoutineForm.semester.toString()}
+                      onValueChange={(value) => setEditRoutineForm(prev => ({ ...prev, semester: parseInt(value) }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6].map(sem => (
+                          <SelectItem key={sem} value={sem.toString()}>
+                            Semester {sem}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="editSection">Section</Label>
+                    <Select
+                      value={editRoutineForm.section}
+                      onValueChange={(value) => setEditRoutineForm(prev => ({ ...prev, section: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['A', 'B', 'C'].map(section => (
+                          <SelectItem key={section} value={section}>
+                            Section {section}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="editAcademicYear">Academic Year</Label>
+                  <Input
+                    id="editAcademicYear"
+                    value={editRoutineForm.academicYear}
+                    onChange={(e) => setEditRoutineForm(prev => ({ ...prev, academicYear: e.target.value }))}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editNumberOfStudents">Number of Students</Label>
+                  <Input
+                    id="editNumberOfStudents"
+                    type="number"
+                    value={editRoutineForm.numberOfStudents}
+                    onChange={(e) => setEditRoutineForm(prev => ({ ...prev, numberOfStudents: parseInt(e.target.value) || 0 }))}
+                    placeholder="e.g., 45"
+                    min="1"
+                    max="200"
+                  />
+                </div>
+                
+                <div className="flex space-x-3">
+                  <Button 
+                    onClick={saveRoutineEdits}
+                    disabled={!editRoutineForm.name || !editRoutineForm.academicYear}
+                    className="flex-1"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setEditDialogOpen(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add Session Dialog */}
+          <Dialog open={addSessionDialogOpen} onOpenChange={(open) => {
+            if (!open) {
+              setAddSessionDialogOpen(false);
+              setSelectedTimeSlot(null);
+            }
+          }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center text-green-600">
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add Session
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {selectedTimeSlot && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Time:</strong> {DAYS[selectedTimeSlot.dayOfWeek]} - {DEFAULT_TIME_SLOTS.find(t => t.id === selectedTimeSlot.timeSlotId)?.label}
+                    </p>
+                    <p className="text-sm text-blue-800">
+                      <strong>Routine:</strong> {selectedRoutine?.name} (Students: {selectedRoutine?.numberOfStudents || 0})
+                    </p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="subjectName">Subject Name *</Label>
+                    <Input
+                      id="subjectName"
+                      value={addSessionForm.subjectName}
+                      onChange={(e) => setAddSessionForm(prev => ({ ...prev, subjectName: e.target.value }))}
+                      placeholder="e.g., Mathematics"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="subjectCode">Subject Code</Label>
+                    <Input
+                      id="subjectCode"
+                      value={addSessionForm.subjectCode}
+                      onChange={(e) => setAddSessionForm(prev => ({ ...prev, subjectCode: e.target.value }))}
+                      placeholder="e.g., MATH101"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="sessionType">Session Type</Label>
+                  <Select
+                    value={addSessionForm.type}
+                    onValueChange={(value: 'theory' | 'practical' | 'tutorial' | 'seminar') => 
+                      setAddSessionForm(prev => ({ ...prev, type: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="theory">Theory</SelectItem>
+                      <SelectItem value="practical">Practical</SelectItem>
+                      <SelectItem value="tutorial">Tutorial</SelectItem>
+                      <SelectItem value="seminar">Seminar</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="facultySelect">Faculty *</Label>
+                  <Select
+                    value={addSessionForm.facultyId}
+                    onValueChange={(value) => setAddSessionForm(prev => ({ ...prev, facultyId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select faculty member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faculty.map(f => (
+                        <SelectItem key={f.id} value={f.id.toString()}>
+                          {f.name} - {f.designation || 'Faculty'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="resourceSelect">Resource (Classroom/Lab) *</Label>
+                  <Select
+                    value={addSessionForm.resourceId}
+                    onValueChange={(value) => setAddSessionForm(prev => ({ ...prev, resourceId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select classroom or lab" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {resources
+                        .filter(r => r.type === 'classroom' || r.type === 'lab')
+                        .map(resource => {
+                          const isOwnDepartment = resource.department === currentHOD?.department;
+                          const capacityWarning = resource.capacity < (selectedRoutine?.numberOfStudents || 0);
+                          const isAvailable = isResourceAvailable(resource.id!.toString());
+                          
+                          return (
+                            <SelectItem 
+                              key={resource.id} 
+                              value={resource.id!.toString()}
+                              disabled={!isAvailable}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className={!isAvailable ? 'text-slate-400' : ''}>
+                                  {resource.name} ({resource.capacity} capacity)
+                                  {!isAvailable && ' - Occupied'}
+                                  {!isOwnDepartment && (
+                                    <Badge variant="outline" className="ml-2 text-xs">
+                                      {resource.department}
+                                    </Badge>
+                                  )}
+                                </span>
+                                {capacityWarning && isAvailable && (
+                                  <AlertTriangle className="h-3 w-3 text-orange-500 ml-2" />
+                                )}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                    </SelectContent>
+                  </Select>
+                  
+                  {addSessionForm.resourceId && (() => {
+                    const selectedResource = resources.find(r => r.id?.toString() === addSessionForm.resourceId);
+                    if (!selectedResource) return null;
+                    
+                    const isOwnDepartment = selectedResource.department === currentHOD?.department;
+                    const capacityWarning = selectedResource.capacity < (selectedRoutine?.numberOfStudents || 0);
+                    
+                    return (
+                      <div className="mt-2 space-y-2">
+                        {!isOwnDepartment && (
+                          <Alert className="border-orange-200 bg-orange-50">
+                            <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            <AlertDescription className="text-orange-800">
+                              This resource belongs to <strong>{selectedResource.department}</strong> department. 
+                              A booking request will be sent for approval.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        
+                        {capacityWarning && (
+                          <Alert className="border-red-200 bg-red-50">
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                            <AlertDescription className="text-red-800">
+                              <strong>Capacity Warning:</strong> This resource has capacity for {selectedResource.capacity} students, 
+                              but your routine has {selectedRoutine?.numberOfStudents || 0} students.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+                
+                <div className="flex space-x-3">
+                  <Button 
+                    onClick={saveNewSession}
+                    disabled={!addSessionForm.subjectName || !addSessionForm.resourceId || !addSessionForm.facultyId}
+                    className="flex-1"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Add Session
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setAddSessionDialogOpen(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -1038,6 +1679,18 @@ export default function RoutineBuilder() {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
+                        initiateEditRoutine(routine);
+                      }}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
+                      title="Edit Routine"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         initiateDeleteRoutine(routine);
                       }}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
@@ -1056,7 +1709,7 @@ export default function RoutineBuilder() {
                     {routine.sessions.length} classes scheduled
                   </div>
                   <div className="text-xs text-slate-400">
-                    Generated: {new Date(routine.generatedAt).toLocaleDateString()}
+                    Students: {routine.numberOfStudents || 'Not specified'} • Generated: {new Date(routine.generatedAt).toLocaleDateString()}
                   </div>
                 </div>
               </div>
@@ -1138,7 +1791,14 @@ export default function RoutineBuilder() {
                                     </Badge>
                                   </div>
                                 ) : (
-                                  <div className="text-center text-slate-400 text-sm">Free</div>
+                                  <div 
+                                    className="text-center text-slate-400 text-sm cursor-pointer hover:bg-slate-50 hover:text-slate-600 p-2 rounded transition-colors"
+                                    onClick={() => initiateAddSession(timeSlot.id, day)}
+                                    title="Click to add a session"
+                                  >
+                                    <Plus className="h-4 w-4 mx-auto mb-1" />
+                                    Add Session
+                                  </div>
                                 )}
                               </td>
                             );

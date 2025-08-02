@@ -7,6 +7,7 @@ export interface Timetable {
   department_id: number;
   section?: string;
   academic_year: string;
+  number_of_students?: number;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -35,22 +36,45 @@ export interface TimetableEntryWithDetails extends TimetableEntry {
 
 export class TimetableModel {
   static async getAll() {
-    return db('timetables').select('*');
+    const timetables = await db('timetables').select('*');
+    return timetables.map(timetable => ({
+      ...timetable,
+      academicYear: timetable.academic_year,
+      numberOfStudents: timetable.number_of_students,
+    }));
   }
 
   static async getById(id: number) {
-    return db('timetables').where({ id }).first();
+    const timetable = await db('timetables').where({ id }).first();
+    if (!timetable) return null;
+    
+    return {
+      ...timetable,
+      academicYear: timetable.academic_year,
+      numberOfStudents: timetable.number_of_students,
+    };
   }
 
   static async getByDepartment(departmentId: number) {
-    return db('timetables').where({ department_id: departmentId }).select('*');
+    const timetables = await db('timetables').where({ department_id: departmentId }).select('*');
+    return timetables.map(timetable => ({
+      ...timetable,
+      academicYear: timetable.academic_year,
+      numberOfStudents: timetable.number_of_students,
+    }));
   }
 
   static async getByDepartmentName(departmentName: string) {
-    return db('timetables')
+    const timetables = await db('timetables')
       .join('departments', 'timetables.department_id', 'departments.id')
       .where('departments.name', departmentName)
       .select('timetables.*', 'departments.name as department_name');
+    
+    return timetables.map(timetable => ({
+      ...timetable,
+      academicYear: timetable.academic_year,
+      numberOfStudents: timetable.number_of_students,
+    }));
   }
 
   static async create(timetable: Timetable) {
@@ -90,6 +114,8 @@ export class TimetableModel {
 
     return {
       ...timetable,
+      academicYear: timetable.academic_year,
+      numberOfStudents: timetable.number_of_students,
       entries,
     };
   }

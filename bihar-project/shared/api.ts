@@ -64,6 +64,7 @@ export interface TimetableData {
   department: string;
   section?: string;
   academicYear: string;
+  numberOfStudents?: number;
   entries: TimetableEntry[];
   createdBy: string;
   createdAt: string;
@@ -76,6 +77,7 @@ export interface CreateTimetableRequest {
   department: string;
   section?: string;
   academicYear: string;
+  numberOfStudents?: number;
   entries: Omit<TimetableEntry, "id">[];
 }
 

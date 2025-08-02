@@ -92,8 +92,17 @@ export async function initializeDatabase() {
       table.foreign('department_id').references('departments.id');
       table.string('section');
       table.string('academic_year').notNullable();
+      table.integer('number_of_students').defaultTo(0);
       table.boolean('is_active').defaultTo(true);
       table.timestamps(true, true);
+    });
+  }
+
+  // Check if number_of_students column exists, if not add it
+  const hasNumberOfStudentsColumn = await db.schema.hasColumn('timetables', 'number_of_students');
+  if (!hasNumberOfStudentsColumn) {
+    await db.schema.table('timetables', (table) => {
+      table.integer('number_of_students').defaultTo(0);
     });
   }
 

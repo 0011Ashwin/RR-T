@@ -9,6 +9,7 @@ export interface CreateTimetableRequest {
   semester: number;
   section?: string;
   academicYear: string;
+  numberOfStudents?: number;
   sessions: Array<{
     courseId: string;
     resourceId: string;

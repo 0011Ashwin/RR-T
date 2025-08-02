@@ -83,6 +83,8 @@ router.get('/department/name/:department', async (req, res) => {
         
         return {
           ...timetable,
+          academicYear: timetable.academic_year,
+          numberOfStudents: timetable.number_of_students,
           entries,
         };
       })
@@ -106,7 +108,7 @@ router.get('/department/name/:department', async (req, res) => {
 // Create a new timetable
 router.post('/', async (req, res) => {
   try {
-    const { name, department, semester, section, academicYear, sessions } = req.body;
+    const { name, department, semester, section, academicYear, numberOfStudents, sessions } = req.body;
     
     // First, find the department_id from department name
     const departmentRecord = await db('departments').where({ name: department }).first();
@@ -128,6 +130,7 @@ router.post('/', async (req, res) => {
       department_id: departmentId,
       section,
       academic_year: academicYear,
+      number_of_students: numberOfStudents || 0,
       is_active: true,
     };
     
@@ -145,6 +148,7 @@ router.post('/', async (req, res) => {
         department: department,
         section: newTimetable.section,
         academicYear: newTimetable.academic_year,
+        numberOfStudents: newTimetable.number_of_students,
         isActive: newTimetable.is_active,
         sessions: [],
       }
@@ -162,17 +166,33 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const timetable = req.body;
-    const updatedTimetable = await TimetableModel.update(id, timetable);
+    const { name, semester, section, academicYear, numberOfStudents, ...rest } = req.body;
+    
+    // Map frontend camelCase to database snake_case
+    const timetableData: any = { ...rest };
+    if (name !== undefined) timetableData.name = name;
+    if (semester !== undefined) timetableData.semester = semester;
+    if (section !== undefined) timetableData.section = section;
+    if (academicYear !== undefined) timetableData.academic_year = academicYear;
+    if (numberOfStudents !== undefined) timetableData.number_of_students = numberOfStudents;
+    
+    const updatedTimetable = await TimetableModel.update(id, timetableData);
     
     if (!updatedTimetable) {
       return res.status(404).json({ error: 'Timetable not found' });
     }
     
-    res.json(updatedTimetable);
+    res.json({
+      success: true,
+      data: updatedTimetable
+    });
   } catch (error) {
     console.error('Error updating timetable:', error);
-    res.status(500).json({ error: 'Failed to update timetable' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update timetable',
+      message: error.message 
+    });
   }
 });
 
