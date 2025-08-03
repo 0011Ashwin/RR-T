@@ -74,6 +74,7 @@ router.get('/department/name/:department', async (req, res) => {
           .where('timetable_entries.timetable_id', timetable.id)
           .select(
             'timetable_entries.*',
+            'timetable_entries.classroom_id as resourceId', // Add resourceId mapping for frontend
             'subjects.name as subject_name',
             'subjects.code as subject_code',
             'faculty.name as faculty_name',
@@ -81,7 +82,7 @@ router.get('/department/name/:department', async (req, res) => {
             'classrooms.room_number as classroom_room_number'
           );
 
-        // Process entries to ensure proper time format
+        // Process entries to ensure proper time format and add frontend-expected fields
         const processedEntries = entries.map(entry => ({
           ...entry,
           start_time: typeof entry.start_time === 'string' && entry.start_time.includes(' ') 
@@ -89,7 +90,12 @@ router.get('/department/name/:department', async (req, res) => {
             : entry.start_time,
           end_time: typeof entry.end_time === 'string' && entry.end_time.includes(' ')
             ? entry.end_time.split(' ')[1].substring(0, 5) // Extract HH:MM from "YYYY-MM-DD HH:MM:SS"
-            : entry.end_time
+            : entry.end_time,
+          // Add startTime field for frontend compatibility (Resources.tsx expects this)
+          startTime: typeof entry.start_time === 'string' && entry.start_time.includes(' ') 
+            ? entry.start_time.split(' ')[1].substring(0, 5)
+            : entry.start_time,
+          dayOfWeek: entry.day_of_week // Add camelCase version
         }));
         
         return {
@@ -112,6 +118,62 @@ router.get('/department/name/:department', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Failed to fetch department timetables' 
+    });
+  }
+});
+
+// Get ALL timetable entries from ALL departments (for checking university resource occupancy)
+router.get('/entries/all', async (req, res) => {
+  try {
+    console.log('Fetching ALL timetable entries from ALL departments');
+    
+    // Get all timetable entries with related data from all departments
+    const allEntries = await db('timetable_entries')
+      .join('subjects', 'timetable_entries.subject_id', '=', 'subjects.id')
+      .join('faculty', 'timetable_entries.faculty_id', '=', 'faculty.id')
+      .join('classrooms', 'timetable_entries.classroom_id', '=', 'classrooms.id')
+      .join('timetables', 'timetable_entries.timetable_id', '=', 'timetables.id')
+      .join('departments', 'timetables.department_id', '=', 'departments.id')
+      .where('timetables.is_active', true) // Only active timetables
+      .select(
+        'timetable_entries.*',
+        'timetable_entries.classroom_id as resourceId', // Add resourceId mapping for frontend
+        'subjects.name as subject_name',
+        'subjects.code as subject_code',
+        'faculty.name as faculty_name',
+        'classrooms.name as classroom_name',
+        'classrooms.room_number as classroom_room_number',
+        'departments.name as department_name',
+        'timetables.name as timetable_name'
+      );
+
+    // Process entries to ensure proper time format and add frontend-expected fields
+    const processedEntries = allEntries.map(entry => ({
+      ...entry,
+      start_time: typeof entry.start_time === 'string' && entry.start_time.includes(' ') 
+        ? entry.start_time.split(' ')[1].substring(0, 5) // Extract HH:MM from "YYYY-MM-DD HH:MM:SS"
+        : entry.start_time,
+      end_time: typeof entry.end_time === 'string' && entry.end_time.includes(' ')
+        ? entry.end_time.split(' ')[1].substring(0, 5) // Extract HH:MM from "YYYY-MM-DD HH:MM:SS"
+        : entry.end_time,
+      // Add startTime field for frontend compatibility (Resources.tsx expects this)
+      startTime: typeof entry.start_time === 'string' && entry.start_time.includes(' ') 
+        ? entry.start_time.split(' ')[1].substring(0, 5)
+        : entry.start_time,
+      dayOfWeek: entry.day_of_week // Add camelCase version
+    }));
+    
+    console.log(`Found ${processedEntries.length} timetable entries across all departments`);
+    
+    res.json({
+      success: true,
+      data: processedEntries
+    });
+  } catch (error) {
+    console.error('Error fetching all timetable entries:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch all timetable entries' 
     });
   }
 });

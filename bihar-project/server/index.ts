@@ -16,6 +16,7 @@ import { bookingRequestRouter } from "./routes/booking-request.js";
 import { classSessionRouter } from "./routes/class-session.js";
 import { timeslotRouter } from "./routes/timeslot.js";
 import { hodRouter } from "./routes/hod.js";
+import debugRouter from "./routes/debug.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -67,6 +68,7 @@ export async function createServer() {
   app.use("/api/admin", adminRouter);
   app.use("/api/class-sessions", classSessionRouter);
   app.use("/api/timeslots", timeslotRouter);
+  app.use("/api/debug", debugRouter);
 
   return app;
 }

@@ -105,6 +105,7 @@ export class TimetableModel {
       .where('timetable_entries.timetable_id', id)
       .select(
         'timetable_entries.*',
+        'timetable_entries.classroom_id as resourceId', // Add resourceId mapping since IDs are synchronized
         'subjects.name as subject_name',
         'subjects.code as subject_code',
         'faculty.name as faculty_name',

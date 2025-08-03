@@ -84,14 +84,17 @@ export class ResourceModel {
   }
 
   static async create(resource: Resource) {
+    // Remove any manually provided ID to ensure database auto-increment is used
+    const { id, ...resourceData } = resource;
+    
     const resourceToInsert = {
-      ...resource,
+      ...resourceData,
       equipment: resource.equipment ? JSON.stringify(resource.equipment) : null,
       facilities: resource.facilities ? JSON.stringify(resource.facilities) : null,
     };
     
-    const [id] = await db('resources').insert(resourceToInsert);
-    return this.getById(id);
+    const [newId] = await db('resources').insert(resourceToInsert);
+    return this.getById(newId);
   }
 
   static async update(id: number, resource: Partial<Resource>) {

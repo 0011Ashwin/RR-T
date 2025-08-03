@@ -64,6 +64,22 @@ export const TimetableService = {
   },
 
   /**
+   * Get ALL timetable entries from ALL departments (for checking university resource occupancy)
+   */
+  getAllTimetableEntries: async (): Promise<{ success: boolean; data?: any[]; message?: string }> => {
+    try {
+      const response = await axios.get(`${API_URL}/entries/all`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all timetable entries:', error);
+      return {
+        success: false,
+        message: 'Failed to fetch all timetable entries'
+      };
+    }
+  },
+
+  /**
    * Get a specific timetable by ID
    */
   getTimetableById: async (id: string): Promise<RoutineResponse> => {

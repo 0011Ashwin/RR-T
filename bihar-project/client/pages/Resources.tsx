@@ -15,6 +15,7 @@ import { Resource, WeeklyTimeSlot, BookingRequest, ClassSession, Course, DEFAULT
 import { ResourceService } from '@/services/resource-service';
 import { BookingRequestService } from '@/services/booking-request-service';
 import { ClassSessionService } from '@/services/class-session-service';
+import { TimetableService } from '@/services/timetable-service';
 import { 
   Building2, 
   Calendar, 
@@ -60,8 +61,10 @@ export default function Resources() {
   const [weeklySlots, setWeeklySlots] = useState<WeeklyTimeSlot[]>([]);
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [classSessions, setClassSessions] = useState<ClassSession[]>([]);
+  const [timetableEntries, setTimetableEntries] = useState<any[]>([]);
+  const [allTimetableEntries, setAllTimetableEntries] = useState<any[]>([]); // For university resources
   const [loading, setLoading] = useState(true);
-  const [showUnavailableSlots, setShowUnavailableSlots] = useState(false);
+  const [showUnavailableSlots, setShowUnavailableSlots] = useState(true);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{
@@ -87,9 +90,25 @@ export default function Resources() {
     return { classrooms, nonClassrooms };
   };
 
+  // Helper function to get appropriate timetable entries for a resource
+  const getTimetableEntriesForResource = (resourceId: string) => {
+    // Find the resource to determine if it's department or university resource
+    const resource = allResources.find(r => r.id?.toString() === resourceId);
+    if (!resource) return allTimetableEntries; // Default to all entries if resource not found
+    
+    // If it's a department resource (belongs to current HOD's department), use department entries
+    // If it's a university resource (different department), use all entries
+    if (resource.department === currentHOD?.department) {
+      return timetableEntries; // Department-specific entries
+    } else {
+      return allTimetableEntries; // All university entries
+    }
+  };
+
   // Manual refresh function to force slot occupancy update
   const refreshSlotOccupancy = () => {
     console.log('Manual refresh triggered - forcing slot occupancy update');
+    console.log('Current data - classSessions:', classSessions.length, 'timetableEntries:', timetableEntries.length, 'bookingRequests:', bookingRequests.length);
     if (weeklySlots.length > 0) {
       setWeeklySlots(prev => prev.map(slot => {
         // Check for class session
@@ -108,6 +127,64 @@ export default function Resources() {
               courseName: `Course ${session.courseId}`,
               department: currentHOD?.department || '',
               faculty: session.faculty,
+              classSize: 0,
+            }
+          };
+        }
+
+        // Check for timetable entry (this is the key fix!)
+        const timeSlot = DEFAULT_TIME_SLOTS.find(ts => ts.id === slot.timeSlotId);
+        const relevantTimetableEntries = getTimetableEntriesForResource(slot.resourceId);
+        const timetableEntry = relevantTimetableEntries.find(entry => {
+          const entryStartTime = entry.startTime ? entry.startTime.substring(0, 5) : entry.start_time; // Handle both formats
+          const slotStartTime = timeSlot?.startTime;
+          
+          // Use resourceId first (if available from updated backend), fallback to classroom_id
+          // Since IDs are synchronized, both should work the same
+          const entryResourceId = entry.resourceId || entry.classroom_id;
+          const resourceMatch = String(entryResourceId) === String(slot.resourceId);
+          const dayMatch = entry.dayOfWeek === slot.dayOfWeek;
+          const timeMatch = entryStartTime === slotStartTime;
+          
+          // Enhanced debug logging for ALL CS Lecture Hall Monday slots
+          if (slot.resourceId === '3' && slot.dayOfWeek === 1) {
+            console.log('� TIMETABLE MATCHING DEBUG for CS Lecture Hall (resourceId=3), Monday (dayOfWeek=1):', {
+              slotInfo: { 
+                resourceId: slot.resourceId, 
+                timeSlotId: slot.timeSlotId, 
+                dayOfWeek: slot.dayOfWeek,
+                timeSlotStartTime: slotStartTime 
+              },
+              entryInfo: {
+                entryId: entry.id,
+                entryResourceId: entryResourceId,
+                entryClassroomId: entry.classroom_id,
+                entryDayOfWeek: entry.dayOfWeek,
+                entryStartTime: entryStartTime,
+                entrySubjectName: entry.subject_name
+              },
+              matching: {
+                resourceMatch: `${entryResourceId} === ${slot.resourceId} ? ${resourceMatch}`,
+                dayMatch: `${entry.dayOfWeek} === ${slot.dayOfWeek} ? ${dayMatch}`,
+                timeMatch: `${entryStartTime} === ${slotStartTime} ? ${timeMatch}`,
+                overallMatch: resourceMatch && dayMatch && timeMatch
+              }
+            });
+          }
+          
+          return resourceMatch && dayMatch && timeMatch;
+        });
+
+        if (timetableEntry) {
+          console.log('Found timetable entry for slot:', slot.resourceId, slot.timeSlotId, slot.dayOfWeek, timetableEntry);
+          return {
+            ...slot,
+            isOccupied: true,
+            occupiedBy: {
+              courseId: timetableEntry.subjectId || timetableEntry.subject_id || '',
+              courseName: timetableEntry.subjectName || timetableEntry.subject_name || 'Scheduled Class',
+              department: currentHOD?.department || '',
+              faculty: timetableEntry.facultyName || timetableEntry.faculty_name || 'Faculty',
               classSize: 0,
             }
           };
@@ -209,6 +286,37 @@ export default function Resources() {
           setClassSessions(sessionsResponse.data);
         }
 
+        // Load timetable entries to check real occupancy
+        // 1. Load entries for current department (for department resources)
+        const timetablesResponse = await TimetableService.getTimetablesByDepartment(currentHOD.department);
+        if (timetablesResponse.success && timetablesResponse.data) {
+          // Collect all entries from all active timetables
+          const allEntries: any[] = [];
+          for (const timetable of timetablesResponse.data) {
+            const timetableAny = timetable as any; // Use any to access API response properties
+            console.log('Processing timetable:', timetableAny.name, 'isActive:', timetableAny.is_active, 'entries:', timetableAny.entries?.length);
+            if (timetableAny.is_active && timetableAny.entries) {
+              console.log('Adding entries from active timetable:', timetableAny.entries);
+              allEntries.push(...timetableAny.entries);
+            }
+          }
+          setTimetableEntries(allEntries);
+          console.log('🎯 LOADED DEPARTMENT TIMETABLE ENTRIES:', allEntries.length, allEntries);
+        }
+
+        // 2. Load ALL timetable entries from ALL departments (for university resources)
+        const allEntriesResponse = await TimetableService.getAllTimetableEntries();
+        if (allEntriesResponse.success && allEntriesResponse.data) {
+          setAllTimetableEntries(allEntriesResponse.data);
+          console.log('🌍 LOADED ALL UNIVERSITY TIMETABLE ENTRIES:', allEntriesResponse.data.length, allEntriesResponse.data);
+          
+          // Debug: specifically check for CS Lecture Hall entries
+          const csLectureHallEntries = allEntriesResponse.data.filter((entry: any) => 
+            (entry.resourceId === 3 || entry.classroom_id === 3) && entry.dayOfWeek === 1
+          );
+          console.log('🏛️ CS LECTURE HALL MONDAY ENTRIES FROM ALL DEPARTMENTS:', csLectureHallEntries);
+        }
+
         // Generate weekly slots for all resources
         generateWeeklySlots(allResourcesData);
 
@@ -254,7 +362,7 @@ export default function Resources() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [weeklySlots.length, classSessions.length, bookingRequests.length]);
+  }, [weeklySlots.length, classSessions.length, timetableEntries.length, allTimetableEntries.length, bookingRequests.length]);
 
   // Generate weekly time slots for resources
   const generateWeeklySlots = (allResources: Resource[]) => {
@@ -278,9 +386,9 @@ export default function Resources() {
     setWeeklySlots(slots);
   };
 
-  // Update slots when class sessions or booking requests change
+  // Update slots when class sessions, timetable entries, or booking requests change
   useEffect(() => {
-    console.log('Slot occupancy useEffect triggered - slots:', weeklySlots.length, 'sessions:', classSessions.length, 'bookings:', bookingRequests.length);
+    console.log('Slot occupancy useEffect triggered - slots:', weeklySlots.length, 'sessions:', classSessions.length, 'timetableEntries:', timetableEntries.length, 'allTimetableEntries:', allTimetableEntries.length, 'bookings:', bookingRequests.length);
     if (weeklySlots.length > 0) {
       console.log('Updating slot occupancy...');
       setWeeklySlots(prev => prev.map(slot => {
@@ -300,6 +408,59 @@ export default function Resources() {
               courseName: `Course ${session.courseId}`,
               department: currentHOD?.department || '',
               faculty: session.faculty,
+              classSize: 0,
+            }
+          };
+        }
+
+        // Check for timetable entry (this is the important part!)
+        const timeSlot = DEFAULT_TIME_SLOTS.find(ts => ts.id === slot.timeSlotId);
+        const relevantTimetableEntries = getTimetableEntriesForResource(slot.resourceId);
+        const timetableEntry = relevantTimetableEntries.find(entry => {
+          const entryStartTime = entry.startTime ? entry.startTime.substring(0, 5) : entry.start_time; // Handle both formats
+          const slotStartTime = timeSlot?.startTime;
+          
+          // Use resourceId first (if available from updated backend), fallback to classroom_id
+          // Since IDs are synchronized, both should work the same
+          const entryResourceId = entry.resourceId || entry.classroom_id;
+          const resourceMatch = String(entryResourceId) === String(slot.resourceId);
+          const dayMatch = entry.dayOfWeek === slot.dayOfWeek;
+          const timeMatch = entryStartTime === slotStartTime;
+          
+          // Enhanced debug logging - log ALL entries for CS Lecture Hall Monday 9-10 slot
+          if (slot.resourceId === '3' && slot.timeSlotId === '2' && slot.dayOfWeek === 1) {
+            console.log('🔍 DETAILED DEBUG for CS Lecture Hall (resourceId=3), Monday (day=1), 9-10 slot (timeSlotId=2):', {
+              entryData: entry,
+              slotData: { resourceId: slot.resourceId, timeSlotId: slot.timeSlotId, dayOfWeek: slot.dayOfWeek },
+              dataSource: relevantTimetableEntries === timetableEntries ? 'DEPARTMENT_ENTRIES' : 'ALL_UNIVERSITY_ENTRIES',
+              matching: {
+                entryResourceId: entryResourceId,
+                entryClassroomId: entry.classroom_id,
+                slotResourceId: slot.resourceId,
+                resourceMatch,
+                entryDay: entry.dayOfWeek,
+                slotDay: slot.dayOfWeek,
+                dayMatch,
+                entryTime: entryStartTime,
+                slotTime: slotStartTime,
+                timeMatch,
+                overallMatch: resourceMatch && dayMatch && timeMatch
+              }
+            });
+          }
+          
+          return resourceMatch && dayMatch && timeMatch;
+        });
+
+        if (timetableEntry) {
+          return {
+            ...slot,
+            isOccupied: true,
+            occupiedBy: {
+              courseId: timetableEntry.subjectId || timetableEntry.subject_id || '',
+              courseName: timetableEntry.subjectName || timetableEntry.subject_name || 'Scheduled Class',
+              department: timetableEntry.department_name || currentHOD?.department || '',
+              faculty: timetableEntry.facultyName || timetableEntry.faculty_name || 'Faculty',
               classSize: 0,
             }
           };
@@ -335,7 +496,7 @@ export default function Resources() {
         };
       }));
     }
-  }, [classSessions, bookingRequests, currentHOD, weeklySlots.length]);
+  }, [classSessions, timetableEntries, allTimetableEntries, bookingRequests, currentHOD, weeklySlots.length]);
 
   const getSlotForResource = (resourceId: string, timeSlotId: string, day: number) => {
     return weeklySlots.find(slot =>
@@ -386,7 +547,19 @@ export default function Resources() {
       (b.status === 'approved' || b.status === 'pending')
     );
 
-    if (existingSession || existingBooking) {
+    // Check for timetable entry conflict
+    const timeSlot = DEFAULT_TIME_SLOTS.find(ts => ts.id === selectedSlot.timeSlotId);
+    const relevantEntriesForConflict = getTimetableEntriesForResource(selectedSlot.resourceId);
+    const existingTimetableEntry = relevantEntriesForConflict.find(entry => {
+      const entryStartTime = entry.startTime ? entry.startTime.substring(0, 5) : entry.start_time;
+      const slotStartTime = timeSlot?.startTime;
+      const entryResourceId = entry.resourceId || entry.classroom_id;
+      return String(entryResourceId) === String(selectedSlot.resourceId) &&
+             entry.dayOfWeek === selectedSlot.dayOfWeek &&
+             entryStartTime === slotStartTime;
+    });
+
+    if (existingSession || existingBooking || existingTimetableEntry) {
       setConflicts(['This time slot is already occupied or has a pending request']);
       return;
     }
@@ -598,7 +771,7 @@ export default function Resources() {
             variant={showUnavailableSlots ? "default" : "outline"}
             className={showUnavailableSlots ? "bg-orange-600 hover:bg-orange-700" : "border-orange-300 text-orange-700 hover:bg-orange-50"}
           >
-            {showUnavailableSlots ? "Hide" : "Show"} Unavailable Slots
+            {showUnavailableSlots ? "Hide" : "Show"} Occupied Slots
           </Button>
           <Button 
             onClick={refreshSlotOccupancy}

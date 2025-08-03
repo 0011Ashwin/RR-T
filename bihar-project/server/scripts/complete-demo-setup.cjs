@@ -172,6 +172,10 @@ async function populateCompleteDemoData() {
     await db('classrooms').del();
     await db('departments').del();
 
+    // Reset auto-increment sequences to ensure consistent IDs
+    console.log('🔄 Resetting ID sequences...');
+    await db.raw('DELETE FROM sqlite_sequence WHERE name IN (?, ?, ?, ?, ?, ?)', ['classrooms', 'resources', 'departments', 'faculty', 'subjects', 'timetables']);
+
     // 1. Insert Departments
     console.log('🏢 Inserting departments...');
     const departments = [
@@ -325,7 +329,7 @@ async function populateCompleteDemoData() {
       // Mathematics Classrooms
       { 
         id: 5,
-        name: 'Math Room 1', 
+        name: 'Math Classroom 1', 
         room_number: 'M-101', 
         capacity: 50, 
         floor: 1, 
@@ -335,7 +339,7 @@ async function populateCompleteDemoData() {
       },
       { 
         id: 6,
-        name: 'Math Room 2', 
+        name: 'Math Classroom 2', 
         room_number: 'M-102', 
         capacity: 50, 
         floor: 1, 
@@ -355,7 +359,7 @@ async function populateCompleteDemoData() {
       },
       { 
         id: 8,
-        name: 'Math Lab', 
+        name: 'Math Computer Lab', 
         room_number: 'M-201', 
         capacity: 40, 
         floor: 2, 
@@ -765,6 +769,21 @@ async function populateCompleteDemoData() {
     // Close database connection
     await db.destroy();
 
+    // Validate classroom-resource ID synchronization
+    console.log('🔍 Validating classroom-resource ID synchronization...');
+    
+    // Reconnect to validate
+    const validateDb = knex({
+      client: 'better-sqlite3',
+      connection: {
+        filename: path.join(__dirname, '..', '..', 'data', 'bihar_university.sqlite'),
+      },
+      useNullAsDefault: true,
+    });
+    
+    await validateClassroomResourceSync(validateDb);
+    await validateDb.destroy();
+
     console.log('✅ Comprehensive demo data population completed successfully!');
     console.log(`
 📊 Demo Data Summary:
@@ -772,7 +791,7 @@ async function populateCompleteDemoData() {
 • ${faculty.length} Faculty Members (5 CS + 5 Math including HODs)
 • ${subjects.length} Subjects/Courses (7 CS + 5 Math)
 • ${classrooms.length} Classrooms (4 CS + 4 Math + 2 Shared)
-• ${resources.length} Resources (4 CS + 4 Math + 2 Shared)
+• ${resources.length} Resources (4 CS + 4 Math + 2 Shared) - IDs SYNCHRONIZED ✅
 • ${timetables.length} Timetables (2 CS + 2 Math)
 • ${entries.length} Timetable Entries (reduced conflicts for testing)
 • ${bookingRequests.length} Booking Requests
@@ -793,6 +812,42 @@ async function populateCompleteDemoData() {
   } catch (error) {
     console.error('❌ Error populating demo data:', error);
     throw error;
+  }
+}
+
+// Function to validate that classroom and resource IDs are synchronized
+async function validateClassroomResourceSync(database) {
+  const classrooms = await database('classrooms').select('id', 'name').orderBy('id');
+  const resources = await database('resources').select('id', 'name').orderBy('id');
+  
+  console.log('📋 Classroom-Resource ID Mapping:');
+  let allMatch = true;
+  
+  for (let i = 0; i < Math.max(classrooms.length, resources.length); i++) {
+    const classroom = classrooms[i];
+    const resource = resources[i];
+    
+    if (!classroom && resource) {
+      console.log(`❌ Missing classroom for resource ID ${resource.id}: ${resource.name}`);
+      allMatch = false;
+    } else if (classroom && !resource) {
+      console.log(`❌ Missing resource for classroom ID ${classroom.id}: ${classroom.name}`);
+      allMatch = false;
+    } else if (classroom && resource) {
+      if (classroom.id === resource.id) {
+        console.log(`✅ ID ${classroom.id}: ${classroom.name} ↔ ${resource.name}`);
+      } else {
+        console.log(`❌ ID mismatch - Classroom ${classroom.id}: ${classroom.name} vs Resource ${resource.id}: ${resource.name}`);
+        allMatch = false;
+      }
+    }
+  }
+  
+  if (allMatch) {
+    console.log('✅ All classroom and resource IDs are properly synchronized!');
+  } else {
+    console.log('❌ Found ID synchronization issues that need to be fixed!');
+    throw new Error('Classroom-Resource ID synchronization failed');
   }
 }
 
