@@ -27,6 +27,5 @@ dist-ssr
 
 # Database files (can be regenerated with complete-demo-setup.cjs)
 data/bihar_university.sqlite
-server/database/bihar_university.sqlite
 *.sqlite
 *.db
