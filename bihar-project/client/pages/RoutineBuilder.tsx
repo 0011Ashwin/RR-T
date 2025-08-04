@@ -64,6 +64,7 @@ export default function RoutineBuilder() {
   const [faculty, setFaculty] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0); // Force re-render when this changes
   const [bookingRequests, setBookingRequests] = useState<any[]>([]); // Pending booking requests
+  const [allTimetableEntries, setAllTimetableEntries] = useState<any[]>([]); // Global timetable entries from all departments
 
   const [newRoutineForm, setNewRoutineForm] = useState({
     name: '',
@@ -271,10 +272,24 @@ export default function RoutineBuilder() {
       }
     };
 
+    const fetchAllTimetableEntries = async () => {
+      try {
+        // Fetch ALL timetable entries from ALL departments for cross-department conflict checking
+        const response = await TimetableService.getAllTimetableEntries();
+        if (response.success && response.data) {
+          setAllTimetableEntries(response.data);
+          console.log('🌍 LOADED ALL TIMETABLE ENTRIES FOR ROUTINE BUILDER:', response.data.length, response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching all timetable entries:', error);
+      }
+    };
+
     fetchRoutines();
     fetchResources();
     fetchCourses();
     fetchBookingRequests();
+    fetchAllTimetableEntries();
   }, [currentHOD, toast]);
 
   // Listen for window focus to refresh data when user returns from other pages
@@ -876,8 +891,8 @@ export default function RoutineBuilder() {
   const isResourceAvailable = (resourceId: string) => {
     if (!selectedTimeSlot || !selectedRoutine) return true;
     
-    // Check if any routine has a session at this time slot using this resource
-    return !routines.some(routine => 
+    // Check local routines (from current department)
+    const localConflict = routines.some(routine => 
       routine.sessions.some(session => 
         session.resourceId === resourceId &&
         session.timeSlotId === selectedTimeSlot.timeSlotId &&
@@ -885,6 +900,47 @@ export default function RoutineBuilder() {
         routine.id !== selectedRoutine.id // Exclude current routine
       )
     );
+
+    if (localConflict) {
+      console.log('❌ Local conflict found for resource', resourceId, 'at', selectedTimeSlot);
+      return false;
+    }
+
+    // Check global timetable entries (from all departments)
+    const timeSlot = DEFAULT_TIME_SLOTS.find(ts => ts.id === selectedTimeSlot.timeSlotId);
+    const globalConflict = allTimetableEntries.some(entry => {
+      const entryStartTime = entry.startTime ? entry.startTime.substring(0, 5) : entry.start_time;
+      const slotStartTime = timeSlot?.startTime;
+      
+      // Use resourceId first (if available from updated backend), fallback to classroom_id
+      // Since IDs are synchronized, both should work the same
+      const entryResourceId = entry.resourceId || entry.classroom_id;
+      const resourceMatch = String(entryResourceId) === String(resourceId);
+      const dayMatch = entry.dayOfWeek === selectedTimeSlot.dayOfWeek;
+      const timeMatch = entryStartTime === slotStartTime;
+      
+      const isConflict = resourceMatch && dayMatch && timeMatch;
+      
+      if (isConflict) {
+        console.log('❌ Global timetable conflict found:', {
+          resourceId,
+          selectedTimeSlot,
+          conflictingEntry: {
+            entryId: entry.id,
+            entryResourceId,
+            entryClassroomId: entry.classroom_id,
+            entryDayOfWeek: entry.dayOfWeek,
+            entryStartTime,
+            departmentName: entry.department_name,
+            subjectName: entry.subject_name
+          }
+        });
+      }
+      
+      return isConflict;
+    });
+
+    return !globalConflict;
   };
 
   // Function to initiate routine editing
