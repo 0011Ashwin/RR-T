@@ -1728,6 +1728,17 @@ export default function RoutineBuilder() {
                     <SelectContent>
                       {resources
                         .filter(r => r.type === 'classroom' || r.type === 'lab')
+                        .sort((a, b) => {
+                          // Sort department resources first, then other resources
+                          const aIsDepartment = a.department === currentHOD?.department;
+                          const bIsDepartment = b.department === currentHOD?.department;
+                          
+                          if (aIsDepartment && !bIsDepartment) return -1;
+                          if (!aIsDepartment && bIsDepartment) return 1;
+                          
+                          // Within same category (department vs non-department), sort by name
+                          return a.name.localeCompare(b.name);
+                        })
                         .map(resource => {
                           const isOwnDepartment = resource.department === currentHOD?.department;
                           const capacityWarning = resource.capacity < (selectedRoutine?.numberOfStudents || 0);
