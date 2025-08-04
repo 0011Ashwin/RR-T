@@ -1,11 +1,19 @@
 const knex = require('knex');
 const path = require('path');
+const fs = require('fs');
+
+// Ensure data directory exists
+const dataDir = path.join(__dirname, '..', '..', 'data');
+if (!fs.existsSync(dataDir)) {
+  console.log('📁 Creating data directory...');
+  fs.mkdirSync(dataDir, { recursive: true });
+}
 
 // Database configuration - point to data directory  
 const db = knex({
   client: 'better-sqlite3',
   connection: {
-    filename: path.join(__dirname, '..', '..', 'data', 'bihar_university.sqlite'),
+    filename: path.join(dataDir, 'bihar_university.sqlite'),
   },
   useNullAsDefault: true,
 });
