@@ -8,9 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHODAuth } from '@/hooks/use-hod-auth';
-import { BookingRequest, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
+import { BookingRequest, Resource, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
 import { UpdateBookingRequestStatusRequest } from '../../shared/api';
 import { BookingRequestService } from '@/services/booking-request-service';
+import { ResourceService } from '@/services/resource-service';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Send,
@@ -22,6 +23,8 @@ import {
   Calendar,
   Building2,
   User,
+  Users,
+  MapPin,
   Filter,
   Search
 } from 'lucide-react';
@@ -40,17 +43,18 @@ export default function BookingRequests() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('received-pending');
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<BookingRequest | null>(null);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
   const [responseText, setResponseText] = useState('');
   const [responseAction, setResponseAction] = useState<'approve' | 'reject'>('approve');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch booking requests from API
+  // Fetch booking requests and resources from API
   useEffect(() => {
     if (!currentHOD) return;
     
-    const fetchBookingRequests = async () => {
+    const fetchData = async () => {
       setIsLoading(true);
       try {
         // Fetch requests where current department is the target
@@ -58,6 +62,9 @@ export default function BookingRequests() {
         
         // Fetch requests sent by current department
         const sentResponse = await BookingRequestService.getRequestsByRequesterDepartment(currentHOD.department);
+        
+        // Fetch all resources so we can display resource names
+        const resourcesResponse = await ResourceService.getAllResources();
         
         if (receivedResponse.success && sentResponse.success) {
           const allRequests = [
@@ -75,11 +82,15 @@ export default function BookingRequests() {
             variant: 'destructive'
           });
         }
+        
+        if (resourcesResponse.success && resourcesResponse.data) {
+          setResources(resourcesResponse.data);
+        }
       } catch (error) {
-        console.error('Error fetching booking requests:', error);
+        console.error('Error fetching data:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load booking requests. Please try again.',
+          description: 'Failed to load data. Please try again.',
           variant: 'destructive'
         });
       } finally {
@@ -87,7 +98,7 @@ export default function BookingRequests() {
       }
     };
     
-    fetchBookingRequests();
+    fetchData();
   }, [currentHOD, toast]);
 
   // Filter received requests
@@ -113,6 +124,12 @@ export default function BookingRequests() {
     req.requesterId === currentHOD?.id && 
     req.status !== 'pending'
   );
+
+  // Helper function to get resource name from ID
+  const getResourceName = (resourceId: string): string => {
+    const resource = resources.find(r => r.id?.toString() === resourceId);
+    return resource ? resource.name : `Resource #${resourceId}`;
+  };
 
   const handleResponse = async (action: 'approve' | 'reject') => {
     if (!selectedRequest || !currentHOD) return;
@@ -278,9 +295,9 @@ export default function BookingRequests() {
                           </Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-600 mb-3">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-slate-600 mb-3">
                           <div className="flex items-center">
-                            <User className="h-4 w-4 mr-2" />
+                            <Building2 className="h-4 w-4 mr-2" />
                             {request.requesterDepartment}
                           </div>
                           <div className="flex items-center">
@@ -292,7 +309,11 @@ export default function BookingRequests() {
                             {getTimeSlotLabel(request.timeSlotId)}
                           </div>
                           <div className="flex items-center">
-                            <Building2 className="h-4 w-4 mr-2" />
+                            <MapPin className="h-4 w-4 mr-2" />
+                            {getResourceName(request.targetResourceId)}
+                          </div>
+                          <div className="flex items-center">
+                            <Users className="h-4 w-4 mr-2" />
                             {request.expectedAttendance} people
                           </div>
                         </div>
@@ -381,9 +402,9 @@ export default function BookingRequests() {
                           </Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-600 mb-3">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-slate-600 mb-3">
                           <div className="flex items-center">
-                            <User className="h-4 w-4 mr-2" />
+                            <Building2 className="h-4 w-4 mr-2" />
                             {request.requesterDepartment}
                           </div>
                           <div className="flex items-center">
@@ -395,7 +416,11 @@ export default function BookingRequests() {
                             {getTimeSlotLabel(request.timeSlotId)}
                           </div>
                           <div className="flex items-center">
-                            <Building2 className="h-4 w-4 mr-2" />
+                            <MapPin className="h-4 w-4 mr-2" />
+                            {getResourceName(request.targetResourceId)}
+                          </div>
+                          <div className="flex items-center">
+                            <Users className="h-4 w-4 mr-2" />
                             {request.expectedAttendance} people
                           </div>
                         </div>
@@ -465,7 +490,7 @@ export default function BookingRequests() {
                           </Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-600 mb-3">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-slate-600 mb-3">
                           <div className="flex items-center">
                             <Building2 className="h-4 w-4 mr-2" />
                             {request.targetDepartment}
@@ -479,7 +504,11 @@ export default function BookingRequests() {
                             {getTimeSlotLabel(request.timeSlotId)}
                           </div>
                           <div className="flex items-center">
-                            <User className="h-4 w-4 mr-2" />
+                            <MapPin className="h-4 w-4 mr-2" />
+                            {getResourceName(request.targetResourceId)}
+                          </div>
+                          <div className="flex items-center">
+                            <Users className="h-4 w-4 mr-2" />
                             {request.expectedAttendance} people
                           </div>
                         </div>
@@ -596,7 +625,7 @@ export default function BookingRequests() {
                           </Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-600 mb-3">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-slate-600 mb-3">
                           <div className="flex items-center">
                             <Building2 className="h-4 w-4 mr-2" />
                             {request.targetDepartment}
@@ -610,7 +639,11 @@ export default function BookingRequests() {
                             {getTimeSlotLabel(request.timeSlotId)}
                           </div>
                           <div className="flex items-center">
-                            <User className="h-4 w-4 mr-2" />
+                            <MapPin className="h-4 w-4 mr-2" />
+                            {getResourceName(request.targetResourceId)}
+                          </div>
+                          <div className="flex items-center">
+                            <Users className="h-4 w-4 mr-2" />
                             {request.expectedAttendance} people
                           </div>
                         </div>
