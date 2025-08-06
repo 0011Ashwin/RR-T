@@ -50,6 +50,8 @@ import {
 import TimetableManagement from "../components/TimetableManagement";
 import ClassAllotmentModule from "../components/ClassAllotmentModule";
 import ResourceOverview from "../components/ResourceOverview";
+import EnhancedResources from "../components/EnhancedResources";
+import EnhancedResourceRequestManagement from "../components/EnhancedResourceRequestManagement";
 
 export default function HODDashboard() {
   const navigate = useNavigate();
@@ -65,7 +67,7 @@ export default function HODDashboard() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/hod-login');
+      navigate('/');
     }
   }, [isAuthenticated, navigate]);
 
@@ -242,7 +244,7 @@ export default function HODDashboard() {
 
   const handleLogout = () => {
     logout();
-    navigate("/hod-login");
+    navigate("/");
   };
 
   const getPriorityColor = (priority: string) => {
@@ -500,7 +502,7 @@ export default function HODDashboard() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-7 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-8 bg-white/80 backdrop-blur-sm">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
@@ -535,6 +537,13 @@ export default function HODDashboard() {
             >
               <Send className="h-4 w-4 mr-2" />
               Requests
+            </TabsTrigger>
+            <TabsTrigger
+              value="resource-requests"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Inter-Dept
             </TabsTrigger>
             <TabsTrigger
               value="faculty"
@@ -659,7 +668,7 @@ export default function HODDashboard() {
 
           {/* Resources Tab */}
           <TabsContent value="resources" className="space-y-6">
-            <Resources />
+            <EnhancedResources />
           </TabsContent>
 
           {/* Routine Builder Tab */}
@@ -675,6 +684,11 @@ export default function HODDashboard() {
           {/* Booking Requests Tab */}
           <TabsContent value="booking-requests" className="space-y-6">
             <BookingRequests />
+          </TabsContent>
+
+          {/* Resource Requests Tab */}
+          <TabsContent value="resource-requests" className="space-y-6">
+            <EnhancedResourceRequestManagement />
           </TabsContent>
 
           {/* Faculty Tab */}

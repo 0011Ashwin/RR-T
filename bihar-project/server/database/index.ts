@@ -19,7 +19,9 @@ const db = knex({
 export async function initializeDatabase() {
   // Create tables if they don't exist
   const tablesExist = await Promise.all([
+    db.schema.hasTable('colleges'),
     db.schema.hasTable('departments'),
+    db.schema.hasTable('hods'),
     db.schema.hasTable('classrooms'),
     db.schema.hasTable('faculty'),
     db.schema.hasTable('subjects'),
@@ -28,20 +30,59 @@ export async function initializeDatabase() {
     db.schema.hasTable('resources'),
     db.schema.hasTable('classroom_bookings'),
     db.schema.hasTable('booking_requests'),
+    db.schema.hasTable('resource_requests'),
   ]);
 
   if (!tablesExist[0]) {
+    await db.schema.createTable('colleges', (table) => {
+      table.increments('id').primary();
+      table.string('name').notNullable();
+      table.string('code').notNullable().unique();
+      table.string('address');
+      table.string('principal_name');
+      table.string('principal_email');
+      table.string('phone');
+      table.integer('university_id').unsigned();
+      table.boolean('is_active').defaultTo(true);
+      table.timestamps(true, true);
+    });
+  }
+
+  if (!tablesExist[1]) {
     await db.schema.createTable('departments', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
       table.string('code').notNullable().unique();
       table.string('hod_name');
       table.string('hod_email');
+      table.integer('college_id').unsigned();
+      table.foreign('college_id').references('colleges.id');
       table.timestamps(true, true);
     });
   }
 
-  if (!tablesExist[1]) {
+  if (!tablesExist[2]) {
+    await db.schema.createTable('hods', (table) => {
+      table.increments('id').primary();
+      table.string('name').notNullable();
+      table.string('email').notNullable().unique();
+      table.string('password').notNullable();
+      table.string('designation').notNullable();
+      table.string('employee_id').notNullable().unique();
+      table.string('phone');
+      table.integer('department_id').unsigned().notNullable();
+      table.foreign('department_id').references('departments.id');
+      table.integer('college_id').unsigned();
+      table.foreign('college_id').references('colleges.id');
+      table.string('join_date').notNullable();
+      table.string('experience');
+      table.string('avatar');
+      table.boolean('is_active').defaultTo(true);
+      table.timestamps(true, true);
+    });
+  }
+
+  if (!tablesExist[3]) {
     await db.schema.createTable('classrooms', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
@@ -58,7 +99,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[2]) {
+  if (!tablesExist[4]) {
     await db.schema.createTable('faculty', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
@@ -70,7 +111,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[3]) {
+  if (!tablesExist[5]) {
     await db.schema.createTable('subjects', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
@@ -83,7 +124,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[4]) {
+  if (!tablesExist[6]) {
     await db.schema.createTable('timetables', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
@@ -106,7 +147,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[5]) {
+  if (!tablesExist[7]) {
     await db.schema.createTable('timetable_entries', (table) => {
       table.increments('id').primary();
       table.integer('timetable_id').unsigned().notNullable();
@@ -124,7 +165,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[6]) {
+  if (!tablesExist[8]) {
     await db.schema.createTable('resources', (table) => {
       table.increments('id').primary();
       table.string('name').notNullable();
@@ -142,7 +183,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[7]) {
+  if (!tablesExist[9]) {
     await db.schema.createTable('classroom_bookings', (table) => {
       table.increments('id').primary();
       table.integer('classroom_id').unsigned().notNullable();
@@ -160,7 +201,7 @@ export async function initializeDatabase() {
     });
   }
 
-  if (!tablesExist[8]) {
+  if (!tablesExist[10]) {
     await db.schema.createTable('booking_requests', (table) => {
       table.string('id').primary();
       table.string('requesterId').notNullable();
@@ -177,6 +218,37 @@ export async function initializeDatabase() {
       table.string('approvedBy');
       table.string('responseDate');
       table.string('notes');
+      table.timestamps(true, true);
+    });
+  }
+
+  if (!tablesExist[11]) {
+    await db.schema.createTable('resource_requests', (table) => {
+      table.increments('id').primary();
+      table.integer('requester_hod_id').unsigned().notNullable();
+      table.foreign('requester_hod_id').references('hods.id');
+      table.integer('requester_department_id').unsigned().notNullable();
+      table.foreign('requester_department_id').references('departments.id');
+      table.integer('target_resource_id').unsigned().notNullable();
+      table.foreign('target_resource_id').references('resources.id');
+      table.integer('target_department_id').unsigned().notNullable();
+      table.foreign('target_department_id').references('departments.id');
+      table.string('requested_date').notNullable();
+      table.string('start_time').notNullable();
+      table.string('end_time').notNullable();
+      table.string('purpose').notNullable();
+      table.string('course_name');
+      table.integer('expected_attendance').notNullable();
+      table.text('additional_requirements');
+      table.string('status').defaultTo('pending'); // 'pending', 'approved', 'rejected', 'cancelled'
+      table.integer('approved_by_hod_id').unsigned();
+      table.foreign('approved_by_hod_id').references('hods.id');
+      table.string('approved_at');
+      table.text('rejection_reason');
+      table.text('notes');
+      table.string('priority').defaultTo('medium'); // 'low', 'medium', 'high', 'urgent'
+      table.boolean('is_recurring').defaultTo(false);
+      table.text('recurring_pattern'); // JSON string for recurring patterns
       table.timestamps(true, true);
     });
   }

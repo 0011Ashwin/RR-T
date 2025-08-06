@@ -43,7 +43,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { GraduationCap, User, Shield, ChevronDown } from "lucide-react";
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogTrigger,
@@ -68,11 +71,14 @@ import {
 export default function Index() {
   const navigate = useNavigate();
   const [activeRole, setActiveRole] = useState<"student" | "admin">("student");
+  const [adminSubRole, setAdminSubRole] = useState<'vc' | 'principal' | 'hod'>('vc');
   const [credentials, setCredentials] = useState({
     email: "",
     password: "",
   });
   const [loginOpen, setLoginOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const newsScrollRef = useRef<HTMLDivElement>(null);
   const [isNewsHovered, setIsNewsHovered] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -137,38 +143,106 @@ export default function Index() {
 
   // LOGIN HANDLER: Process authentication and route to appropriate dashboard
   // Sets localStorage for session management and navigates based on role
-  const handleLogin = () => {
-    if (activeRole === "student") {
-      // STUDENT LOGIN: Any credentials accepted for demo purposes
-      if (credentials.email && credentials.password) {
+  const handleLogin = async () => {
+    if (!credentials.email || !credentials.password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (activeRole === "student") {
+        // STUDENT LOGIN: Any credentials accepted for demo purposes
         localStorage.setItem("userRole", "student");
         localStorage.setItem("userEmail", credentials.email);
+        toast.success('Login successful!');
+        setLoginOpen(false);
         navigate("/student"); // → StudentDashboard.tsx
-      }
-    } else if (activeRole === "admin") {
-      // ADMIN LOGIN: Check against predefined admin accounts
-      if (credentials.email && credentials.password) {
-        const adminType = adminAccounts[credentials.email.toLowerCase()];
-        if (adminType) {
-          localStorage.setItem("userRole", "admin");
-          localStorage.setItem("adminType", adminType);
-          localStorage.setItem("userEmail", credentials.email);
-          // ROLE-BASED ROUTING: Navigate to appropriate dashboard
-          switch (adminType) {
-            case "vc":
-              navigate("/university"); // → UniversityDashboard.tsx
-              break;
-            case "principal":
-              navigate("/principal"); // → CollegeDashboard.tsx
-              break;
-            case "hod":
-              navigate("/department"); // → HODDashboard.tsx
-              break;
+      } else if (activeRole === "admin") {
+        console.log('Admin login attempt:', { adminSubRole, email: credentials.email });
+
+        if (adminSubRole === 'hod') {
+          // HOD login - using reliable client-side authentication for demo
+          console.log('Attempting HOD authentication');
+
+          // Define valid HOD accounts
+          const validHODs = {
+            'amitabh.singh@bec.ac.in': { id: '1', name: 'Dr. Amitabh Singh', department: 'CSE' },
+            'sunita.kumari@bec.ac.in': { id: '2', name: 'Dr. Sunita Kumari', department: 'ECE' },
+            'rajesh.prasad@bec.ac.in': { id: '3', name: 'Dr. Rajesh Prasad', department: 'ME' },
+            'anita.sharma@bec.ac.in': { id: '4', name: 'Dr. Anita Sharma', department: 'CE' },
+            'manoj.kumar@msc.ac.in': { id: '5', name: 'Dr. Manoj Kumar', department: 'Physics' },
+            'kavita.singh@msc.ac.in': { id: '6', name: 'Dr. Kavita Singh', department: 'Chemistry' },
+            'pradeep.thakur@msc.ac.in': { id: '7', name: 'Dr. Pradeep Thakur', department: 'Mathematics' },
+            'sushma.devi@msc.ac.in': { id: '8', name: 'Dr. Sushma Devi', department: 'Geography' }
+          };
+
+          const hodAccount = validHODs[credentials.email.toLowerCase()];
+
+          if (hodAccount && credentials.password === 'hod123') {
+            // Valid HOD credentials
+            localStorage.setItem('currentHODId', hodAccount.id);
+            localStorage.setItem('userRole', 'hod');
+            localStorage.setItem('userEmail', credentials.email);
+            localStorage.setItem('hodName', hodAccount.name);
+            localStorage.setItem('hodDepartment', hodAccount.department);
+
+            console.log('HOD authentication successful:', hodAccount);
+            toast.success(`Welcome ${hodAccount.name}!`);
+            setLoginOpen(false);
+            navigate('/department');
+          } else {
+            setError('Invalid HOD credentials. Please use a valid HOD email and password "hod123".');
           }
         } else {
-          // Optionally show error: not a recognized admin
+          // Handle VC and Principal login with static accounts
+          if (adminSubRole === 'vc' && credentials.email.toLowerCase() === 'vc@example.com') {
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('adminType', 'vc');
+            localStorage.setItem('userEmail', credentials.email);
+            toast.success('VC login successful!');
+            setLoginOpen(false);
+            navigate('/university');
+          } else if (adminSubRole === 'principal' && credentials.email.toLowerCase() === 'principal@example.com') {
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('adminType', 'principal');
+            localStorage.setItem('userEmail', credentials.email);
+            toast.success('Principal login successful!');
+            setLoginOpen(false);
+            navigate('/principal');
+          } else {
+            // Check if it's one of the predefined admin accounts
+            const predefinedAdminType = adminAccounts[credentials.email.toLowerCase()];
+            if (predefinedAdminType) {
+              localStorage.setItem('userRole', 'admin');
+              localStorage.setItem('adminType', predefinedAdminType);
+              localStorage.setItem('userEmail', credentials.email);
+              toast.success('Login successful!');
+              setLoginOpen(false);
+              switch (predefinedAdminType) {
+                case 'vc':
+                  navigate('/university');
+                  break;
+                case 'principal':
+                  navigate('/principal');
+                  break;
+                case 'hod':
+                  navigate('/department');
+                  break;
+              }
+            } else {
+              setError(`Invalid ${adminSubRole.toUpperCase()} credentials. Please check your email and password.`);
+            }
+          }
         }
       }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Login failed. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -249,13 +323,6 @@ export default function Index() {
         </div>
         {/* LOGIN TRIGGERS */}
         <div className="flex items-center gap-3">
-          <Button
-            onClick={() => navigate('/hod-login')}
-            variant="outline"
-            className="bg-white/10 text-white border-white/20 px-4 py-2 rounded-md font-semibold hover:bg-white/20"
-          >
-            HOD Portal
-          </Button>
           <Button
             onClick={() => setLoginOpen(true)}
             className="bg-admin text-admin-foreground px-6 py-2 rounded-md font-semibold shadow-none"
@@ -690,16 +757,43 @@ export default function Index() {
                     </div>
                     <CardTitle>Admin Portal</CardTitle>
                     <CardDescription>
-                      Login with Email and Password
+                      Login as VC, Principal, or HOD
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="admin-email">Email</Label>
+                      <Label htmlFor="admin-type">Admin Type</Label>
+                      <Select
+                        value={adminSubRole}
+                        onValueChange={(value: 'vc' | 'principal' | 'hod') => {
+                          console.log('Admin type changed to:', value);
+                          setAdminSubRole(value);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select admin type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="vc">Vice Chancellor (VC)</SelectItem>
+                          <SelectItem value="principal">Principal</SelectItem>
+                          <SelectItem value="hod">Head of Department (HOD)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-email">
+                        {adminSubRole === 'hod' ? 'HOD Email' : 'Email'}
+                      </Label>
                       <Input
                         id="admin-email"
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder={
+                          adminSubRole === 'hod'
+                            ? 'Enter your HOD email (e.g., amitabh.singh@bec.ac.in)'
+                            : adminSubRole === 'vc'
+                              ? 'vc@example.com'
+                              : 'principal@example.com'
+                        }
                         value={credentials.email}
                         onChange={(e) =>
                           setCredentials((prev) => ({
@@ -710,11 +804,17 @@ export default function Index() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="admin-password">Password</Label>
+                      <Label htmlFor="admin-password">
+                        {adminSubRole === 'hod' ? 'HOD Password' : 'Password'}
+                      </Label>
                       <Input
                         id="admin-password"
                         type="password"
-                        placeholder="Enter your password"
+                        placeholder={
+                          adminSubRole === 'hod'
+                            ? 'Enter your HOD password (default: hod123)'
+                            : 'Enter your password'
+                        }
                         value={credentials.password}
                         onChange={(e) =>
                           setCredentials((prev) => ({
@@ -724,13 +824,79 @@ export default function Index() {
                         }
                       />
                     </div>
+
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+
                     <Button
                       className="w-full bg-admin hover:bg-admin/90 text-admin-foreground"
                       onClick={handleLogin}
-                      disabled={!credentials.email || !credentials.password}
+                      disabled={!credentials.email || !credentials.password || isLoading}
                     >
-                      Login as Admin
+                      {isLoading ? (
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Signing in...
+                        </div>
+                      ) : (
+                        `Login as ${adminSubRole === 'vc' ? 'VC' : adminSubRole === 'principal' ? 'Principal' : 'HOD'}`
+                      )}
                     </Button>
+
+                    {adminSubRole === 'hod' && (
+                      <div className="mt-4 space-y-3">
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="text-sm text-blue-800">
+                            <strong>Demo HOD Accounts:</strong>
+                            <div className="mt-1 space-y-1 text-xs">
+                              <div>• amitabh.singh@bec.ac.in (CSE)</div>
+                              <div>• sunita.kumari@bec.ac.in (ECE)</div>
+                              <div>• manoj.kumar@msc.ac.in (Physics)</div>
+                              <div className="mt-2"><strong>Password:</strong> hod123</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                console.log('Testing HOD endpoint...');
+                                const response = await fetch('/api/hod-auth/test-hods');
+                                console.log('Test response:', response.status, response.statusText);
+                                const data = await response.json();
+                                console.log('Test data:', data);
+                                toast.success(`DB Test: Found ${data.count} HODs`);
+                              } catch (error) {
+                                console.error('Test error:', error);
+                                toast.error('DB Test failed');
+                              }
+                            }}
+                          >
+                            Test DB
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCredentials({
+                                email: 'amitabh.singh@bec.ac.in',
+                                password: 'hod123'
+                              });
+                              toast.info('Demo credentials filled');
+                            }}
+                          >
+                            Fill Demo
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
