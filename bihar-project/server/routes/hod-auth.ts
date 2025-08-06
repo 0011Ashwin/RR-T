@@ -1,16 +1,24 @@
 import { Router } from 'express';
 import { HODModel } from '../models/HOD.js';
+import { FacultyModel } from '../models/Faculty.js';
 
 const router = Router();
 
 // Test route to check HODs
 router.get('/test-hods', async (req, res) => {
   try {
-    const hods = await HODModel.getAll();
+    // Use FacultyModel to get HODs since they're stored in faculty table
+    const hods = await FacultyModel.getHODs();
     res.json({
       message: 'HODs found',
       count: hods.length,
-      hods: hods.map(h => ({ id: h.id, name: h.name, email: h.email, is_active: h.is_active }))
+      hods: hods.map(h => ({ 
+        id: h.id, 
+        name: h.name, 
+        email: h.email, 
+        designation: h.designation,
+        department: h.department_name 
+      }))
     });
   } catch (error) {
     console.error('Error fetching HODs:', error);
@@ -18,10 +26,10 @@ router.get('/test-hods', async (req, res) => {
   }
 });
 
-// HOD Login
+// HOD Login - Updated to use faculty table
 router.post('/login', async (req, res) => {
   try {
-    console.log('Login attempt:', req.body);
+    console.log('HOD Login attempt:', req.body);
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -29,22 +37,36 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Authenticate HOD
-    console.log('Attempting authentication for:', email);
-    const hod = await HODModel.authenticate(email, password);
-    console.log('Authentication result:', hod ? 'Success' : 'Failed');
+    console.log('Attempting HOD authentication for:', email);
+    
+    // Get HOD from faculty table by email
+    const hod = await FacultyModel.getHODByEmail(email);
+    console.log('HOD found:', hod ? 'Yes' : 'No');
 
     if (!hod) {
-      return res.status(401).json({ error: 'Invalid credentials or inactive account' });
+      console.log('HOD not found for email:', email);
+      return res.status(401).json({ error: 'Invalid credentials - HOD not found' });
     }
 
-    // In a real app, you would generate a JWT token here
-    // For now, we'll just return the HOD data
-    console.log('Login successful for:', hod.name);
+    // For demo purposes, accept any password (in production, hash and compare passwords)
+    console.log('Password provided:', password);
+    if (password !== 'hod123') {
+      console.log('Invalid password for HOD:', email);
+      return res.status(401).json({ error: 'Invalid password' });
+    }
+
+    console.log('HOD login successful for:', hod.name);
     res.json({
       success: true,
       message: 'Login successful',
-      hod: hod
+      hod: {
+        id: hod.id,
+        name: hod.name,
+        email: hod.email,
+        designation: hod.designation,
+        department: hod.department_name,
+        department_id: hod.department_id
+      }
     });
 
   } catch (error) {

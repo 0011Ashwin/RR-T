@@ -50,7 +50,6 @@ import {
 import TimetableManagement from "../components/TimetableManagement";
 import ClassAllotmentModule from "../components/ClassAllotmentModule";
 import ResourceOverview from "../components/ResourceOverview";
-import EnhancedResources from "../components/EnhancedResources";
 import EnhancedResourceRequestManagement from "../components/EnhancedResourceRequestManagement";
 
 export default function HODDashboard() {
@@ -668,7 +667,7 @@ export default function HODDashboard() {
 
           {/* Resources Tab */}
           <TabsContent value="resources" className="space-y-6">
-            <EnhancedResources />
+            <Resources />
           </TabsContent>
 
           {/* Routine Builder Tab */}

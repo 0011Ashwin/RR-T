@@ -47,6 +47,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { GraduationCap, User, Shield, ChevronDown } from "lucide-react";
 import { toast } from 'sonner';
+import { HODService } from '@/services/hod-service';
+import { useHODAuth } from '@/hooks/use-hod-auth';
 import {
   Dialog,
   DialogTrigger,
@@ -70,6 +72,7 @@ import {
 
 export default function Index() {
   const navigate = useNavigate();
+  const { login: hodLogin } = useHODAuth();
   const [activeRole, setActiveRole] = useState<"student" | "admin">("student");
   const [adminSubRole, setAdminSubRole] = useState<'vc' | 'principal' | 'hod'>('vc');
   const [credentials, setCredentials] = useState({
@@ -79,6 +82,14 @@ export default function Index() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hods, setHods] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    department: string;
+    designation: string;
+  }>>([]);
+  const [hodsLoading, setHodsLoading] = useState(false);
   const newsScrollRef = useRef<HTMLDivElement>(null);
   const [isNewsHovered, setIsNewsHovered] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -132,6 +143,73 @@ export default function Index() {
     const interval = setInterval(scroll, 60);
     return () => clearInterval(interval);
   }, [isNewsHovered]);
+
+  // Load HODs from database when component mounts
+  useEffect(() => {
+    loadHODs();
+  }, []);
+
+  const loadHODs = async () => {
+    setHodsLoading(true);
+    try {
+      console.log('🔍 Loading HODs from database...');
+      const response = await HODService.getAllHODs();
+      console.log('📊 HOD Service Response:', response);
+      if (response.success && response.data) {
+        console.log('✅ HODs loaded successfully:', response.data);
+        setHods(response.data);
+      } else {
+        console.log('❌ Failed to load HODs:', response.message);
+      }
+    } catch (error) {
+      console.error('❌ Error loading HODs:', error);
+    } finally {
+      setHodsLoading(false);
+    }
+  };
+
+  const quickLoginHOD = async (hod: { id: string; name: string; email: string; department: string }) => {
+    setCredentials({ email: hod.email, password: 'hod123' });
+    setAdminSubRole('hod');
+    toast.info(`Quick login for ${hod.name} (${hod.department})`);
+    
+    // Use the HOD Auth context's login method for proper state management
+    try {
+      setIsLoading(true);
+      console.log('🚀 Starting quick login for:', hod.name);
+      
+      const success = await hodLogin(hod.email);
+      
+      if (success) {
+        console.log('✅ HOD login successful');
+        
+        // Set additional localStorage items that the context doesn't handle
+        localStorage.setItem('userRole', 'admin');
+        localStorage.setItem('adminType', 'hod');
+        localStorage.setItem('userEmail', hod.email);
+        localStorage.setItem('hodName', hod.name);
+        localStorage.setItem('hodDepartment', hod.department);
+        
+        console.log('💾 Additional localStorage set, closing dialog...');
+        setLoginOpen(false);
+        
+        console.log('🧭 Navigating to /department...');
+        toast.success(`Logged in as ${hod.name}!`);
+        
+        // Navigate immediately since context state is now properly set
+        navigate('/department');
+        console.log('✅ Navigation completed');
+      } else {
+        console.error('❌ HOD login failed');
+        toast.error('Quick login failed');
+      }
+    } catch (error) {
+      console.error('❌ Quick login error:', error);
+      toast.error('Quick login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // ADMIN ACCOUNTS: Predefined admin emails with role mapping
   // Maps email addresses to admin types for role-based routing
@@ -850,35 +928,48 @@ export default function Index() {
                       <div className="mt-4 space-y-3">
                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                           <div className="text-sm text-blue-800">
-                            <strong>Demo HOD Accounts:</strong>
-                            <div className="mt-1 space-y-1 text-xs">
-                              <div>• amitabh.singh@bec.ac.in (CSE)</div>
-                              <div>• sunita.kumari@bec.ac.in (ECE)</div>
-                              <div>• manoj.kumar@msc.ac.in (Physics)</div>
-                              <div className="mt-2"><strong>Password:</strong> hod123</div>
-                            </div>
+                            <strong>Quick Login - HODs from Database:</strong>
+                            <div className="mt-2 text-xs">Click any HOD below to instantly log in (password: hod123)</div>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        {hodsLoading ? (
+                          <div className="text-center text-sm text-gray-500">Loading HODs from database...</div>
+                        ) : hods.length > 0 ? (
+                          <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                            {hods.map((hod) => (
+                              <Button
+                                key={hod.id}
+                                variant="outline"
+                                size="sm"
+                                className="justify-start text-left h-auto p-3"
+                                onClick={() => quickLoginHOD(hod)}
+                                disabled={isLoading}
+                              >
+                                <div className="flex flex-col items-start">
+                                  <div className="font-medium text-sm">{hod.name}</div>
+                                  <div className="text-xs text-gray-500">{hod.department} Dept.</div>
+                                  <div className="text-xs text-gray-400">{hod.email}</div>
+                                </div>
+                              </Button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center text-sm text-gray-500">
+                            No HODs found in database. 
+                            <br />
+                            <span className="text-xs">Try running the demo setup script or click Refresh HODs.</span>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={async () => {
-                              try {
-                                console.log('Testing HOD endpoint...');
-                                const response = await fetch('/api/hod-auth/test-hods');
-                                console.log('Test response:', response.status, response.statusText);
-                                const data = await response.json();
-                                console.log('Test data:', data);
-                                toast.success(`DB Test: Found ${data.count} HODs`);
-                              } catch (error) {
-                                console.error('Test error:', error);
-                                toast.error('DB Test failed');
-                              }
-                            }}
+                            onClick={loadHODs}
+                            disabled={hodsLoading}
                           >
-                            Test DB
+                            {hodsLoading ? 'Loading...' : 'Refresh HODs'}
                           </Button>
 
                           <Button
@@ -886,13 +977,13 @@ export default function Index() {
                             size="sm"
                             onClick={() => {
                               setCredentials({
-                                email: 'amitabh.singh@bec.ac.in',
+                                email: 'test@example.com',
                                 password: 'hod123'
                               });
-                              toast.info('Demo credentials filled');
+                              toast.info('Manual credentials filled');
                             }}
                           >
-                            Fill Demo
+                            Fill Manual
                           </Button>
                         </div>
                       </div>
