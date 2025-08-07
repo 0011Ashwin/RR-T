@@ -48,6 +48,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { GraduationCap, User, Shield, ChevronDown } from "lucide-react";
 import { toast } from 'sonner';
 import { HODService } from '@/services/hod-service';
+import { PrincipalService } from '@/services/principal-service';
 import { useHODAuth } from '@/hooks/use-hod-auth';
 import {
   Dialog,
@@ -89,7 +90,16 @@ export default function Index() {
     department: string;
     designation: string;
   }>>([]);
+  const [principals, setPrincipals] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    college: string;
+    qualification: string;
+    experience: string;
+  }>>([]);
   const [hodsLoading, setHodsLoading] = useState(false);
+  const [principalsLoading, setPrincipalsLoading] = useState(false);
   const newsScrollRef = useRef<HTMLDivElement>(null);
   const [isNewsHovered, setIsNewsHovered] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -147,6 +157,7 @@ export default function Index() {
   // Load HODs from database when component mounts
   useEffect(() => {
     loadHODs();
+    loadPrincipals();
   }, []);
 
   const loadHODs = async () => {
@@ -165,6 +176,67 @@ export default function Index() {
       console.error('❌ Error loading HODs:', error);
     } finally {
       setHodsLoading(false);
+    }
+  };
+
+  const loadPrincipals = async () => {
+    setPrincipalsLoading(true);
+    try {
+      console.log('🔍 Loading Principals from database...');
+      const response = await PrincipalService.getAllPrincipals();
+      console.log('📊 Principal Service Response:', response);
+      if (response.success && response.data) {
+        console.log('✅ Principals loaded successfully:', response.data);
+        setPrincipals(response.data);
+      } else {
+        console.log('❌ Failed to load Principals:', response.message);
+      }
+    } catch (error) {
+      console.error('❌ Error loading Principals:', error);
+    } finally {
+      setPrincipalsLoading(false);
+    }
+  };
+
+  const quickLoginPrincipal = async (principal: { id: string; name: string; email: string; college: string }) => {
+    setCredentials({ email: principal.email, password: 'principal123' });
+    setAdminSubRole('principal');
+    toast.info(`Quick login for ${principal.name} (${principal.college})`);
+    
+    try {
+      setIsLoading(true);
+      console.log('🚀 Starting quick login for Principal:', principal.name);
+      
+      const response = await PrincipalService.login(principal.email);
+      
+      if (response.success && response.data) {
+        console.log('✅ Principal login successful');
+        
+        // Set localStorage items for principal session
+        localStorage.setItem('userRole', 'admin');
+        localStorage.setItem('adminType', 'principal');
+        localStorage.setItem('userEmail', principal.email);
+        localStorage.setItem('principalName', principal.name);
+        localStorage.setItem('principalCollege', principal.college);
+        localStorage.setItem('currentPrincipalId', principal.id);
+        
+        console.log('💾 Principal localStorage set, closing dialog...');
+        setLoginOpen(false);
+        
+        console.log('🧭 Navigating to /principal...');
+        toast.success(`Logged in as ${principal.name}!`);
+        
+        navigate('/principal');
+        console.log('✅ Navigation completed');
+      } else {
+        console.error('❌ Principal login failed:', response.message);
+        toast.error('Quick login failed');
+      }
+    } catch (error) {
+      console.error('❌ Principal quick login error:', error);
+      toast.error('Quick login failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -283,13 +355,34 @@ export default function Index() {
             toast.success('VC login successful!');
             setLoginOpen(false);
             navigate('/university');
-          } else if (adminSubRole === 'principal' && credentials.email.toLowerCase() === 'principal@example.com') {
-            localStorage.setItem('userRole', 'admin');
-            localStorage.setItem('adminType', 'principal');
-            localStorage.setItem('userEmail', credentials.email);
-            toast.success('Principal login successful!');
-            setLoginOpen(false);
-            navigate('/principal');
+        } else if (adminSubRole === 'principal') {
+          // Principal login - using client-side authentication for demo
+          console.log('Attempting Principal authentication');
+
+          try {
+            const response = await PrincipalService.login(credentials.email);
+            
+            if (response.success && response.data && credentials.password === 'principal123') {
+              // Valid Principal credentials
+              const principalData = response.data;
+              localStorage.setItem('currentPrincipalId', principalData.id);
+              localStorage.setItem('userRole', 'admin');
+              localStorage.setItem('adminType', 'principal');
+              localStorage.setItem('userEmail', credentials.email);
+              localStorage.setItem('principalName', principalData.name);
+              localStorage.setItem('principalCollege', principalData.college);
+
+              console.log('Principal authentication successful:', principalData);
+              toast.success(`Welcome ${principalData.name}!`);
+              setLoginOpen(false);
+              navigate('/principal');
+            } else {
+              setError('Invalid Principal credentials. Please use a valid Principal email and password "principal123".');
+            }
+          } catch (error) {
+            console.error('Principal login error:', error);
+            setError('Principal login failed. Please try again.');
+          }
           } else {
             // Check if it's one of the predefined admin accounts
             const predefinedAdminType = adminAccounts[credentials.email.toLowerCase()];
@@ -860,7 +953,7 @@ export default function Index() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="admin-email">
-                        {adminSubRole === 'hod' ? 'HOD Email' : 'Email'}
+                        {adminSubRole === 'hod' ? 'HOD Email' : adminSubRole === 'principal' ? 'Principal Email' : 'Email'}
                       </Label>
                       <Input
                         id="admin-email"
@@ -868,9 +961,11 @@ export default function Index() {
                         placeholder={
                           adminSubRole === 'hod'
                             ? 'Enter your HOD email (e.g., amitabh.singh@bec.ac.in)'
-                            : adminSubRole === 'vc'
-                              ? 'vc@example.com'
-                              : 'principal@example.com'
+                            : adminSubRole === 'principal'
+                              ? 'Enter your Principal email (e.g., amitabh.singh@bec.ac.in)'
+                              : adminSubRole === 'vc'
+                                ? 'vc@example.com'
+                                : 'Enter your email'
                         }
                         value={credentials.email}
                         onChange={(e) =>
@@ -883,7 +978,7 @@ export default function Index() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="admin-password">
-                        {adminSubRole === 'hod' ? 'HOD Password' : 'Password'}
+                        {adminSubRole === 'hod' ? 'HOD Password' : adminSubRole === 'principal' ? 'Principal Password' : 'Password'}
                       </Label>
                       <Input
                         id="admin-password"
@@ -891,7 +986,9 @@ export default function Index() {
                         placeholder={
                           adminSubRole === 'hod'
                             ? 'Enter your HOD password (default: hod123)'
-                            : 'Enter your password'
+                            : adminSubRole === 'principal'
+                              ? 'Enter your Principal password (default: principal123)'
+                              : 'Enter your password'
                         }
                         value={credentials.password}
                         onChange={(e) =>
@@ -979,6 +1076,71 @@ export default function Index() {
                               setCredentials({
                                 email: 'test@example.com',
                                 password: 'hod123'
+                              });
+                              toast.info('Manual credentials filled');
+                            }}
+                          >
+                            Fill Manual
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {adminSubRole === 'principal' && (
+                      <div className="mt-4 space-y-3">
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="text-sm text-green-800">
+                            <strong>Quick Login - Principals from Database:</strong>
+                            <div className="mt-2 text-xs">Click any Principal below to instantly log in (password: principal123)</div>
+                          </div>
+                        </div>
+
+                        {principalsLoading ? (
+                          <div className="text-center text-sm text-gray-500">Loading Principals from database...</div>
+                        ) : principals.length > 0 ? (
+                          <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                            {principals.map((principal) => (
+                              <Button
+                                key={principal.id}
+                                variant="outline"
+                                size="sm"
+                                className="justify-start text-left h-auto p-3"
+                                onClick={() => quickLoginPrincipal(principal)}
+                                disabled={isLoading}
+                              >
+                                <div className="flex flex-col items-start">
+                                  <div className="font-medium text-sm">{principal.name}</div>
+                                  <div className="text-xs text-gray-500">{principal.college}</div>
+                                  <div className="text-xs text-gray-400">{principal.email}</div>
+                                </div>
+                              </Button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center text-sm text-gray-500">
+                            No Principals found in database. 
+                            <br />
+                            <span className="text-xs">Try running the demo setup script or click Refresh Principals.</span>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={loadPrincipals}
+                            disabled={principalsLoading}
+                          >
+                            {principalsLoading ? 'Loading...' : 'Refresh Principals'}
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCredentials({
+                                email: 'test@principal.com',
+                                password: 'principal123'
                               });
                               toast.info('Manual credentials filled');
                             }}

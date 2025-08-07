@@ -158,6 +158,45 @@ async function createDatabaseSchema() {
     });
   }
 
+  // Create colleges table
+  if (!(await db.schema.hasTable('colleges'))) {
+    await db.schema.createTable('colleges', (table) => {
+      table.increments('id').primary();
+      table.string('name').notNullable();
+      table.string('code').notNullable().unique();
+      table.string('address').notNullable();
+      table.string('city').notNullable();
+      table.string('state').defaultTo('Bihar');
+      table.string('pincode').notNullable();
+      table.string('phone');
+      table.string('email');
+      table.string('website');
+      table.string('affiliation');
+      table.integer('established_year');
+      table.text('about');
+      table.boolean('is_active').defaultTo(true);
+      table.timestamps(true, true);
+    });
+  }
+
+  // Create principals table
+  if (!(await db.schema.hasTable('principals'))) {
+    await db.schema.createTable('principals', (table) => {
+      table.increments('id').primary();
+      table.string('name').notNullable();
+      table.string('email').notNullable().unique();
+      table.integer('college_id').notNullable().references('id').inTable('colleges');
+      table.string('phone');
+      table.string('qualification');
+      table.string('experience');
+      table.string('employee_id');
+      table.date('join_date');
+      table.text('about');
+      table.boolean('is_active').defaultTo(true);
+      table.timestamps(true, true);
+    });
+  }
+
   console.log('✅ Database schema created successfully');
 }
 
@@ -176,13 +215,15 @@ async function populateCompleteDemoData() {
     await db('classroom_bookings').del();
     await db('subjects').del();
     await db('faculty').del();
+    await db('principals').del();
+    await db('colleges').del();
     await db('resources').del();
     await db('classrooms').del();
     await db('departments').del();
 
     // Reset auto-increment sequences to ensure consistent IDs
     console.log('🔄 Resetting ID sequences...');
-    await db.raw('DELETE FROM sqlite_sequence WHERE name IN (?, ?, ?, ?, ?, ?)', ['classrooms', 'resources', 'departments', 'faculty', 'subjects', 'timetables']);
+    await db.raw('DELETE FROM sqlite_sequence WHERE name IN (?, ?, ?, ?, ?, ?, ?, ?)', ['classrooms', 'resources', 'departments', 'faculty', 'subjects', 'timetables', 'colleges', 'principals']);
 
     // 1. Insert Departments
     console.log('🏢 Inserting departments...');
@@ -287,6 +328,51 @@ async function populateCompleteDemoData() {
 
     for (const fac of faculty) {
       await db('faculty').insert(fac);
+    }
+
+    // 2.5. Insert Colleges
+    console.log('🏛️ Inserting colleges...');
+    const colleges = [
+      {
+        id: 1,
+        name: 'Magadh Mahila College',
+        code: 'MMC',
+        address: 'Patna-Gaya Road, Patna',
+        city: 'Patna',
+        state: 'Bihar',
+        pincode: '800001',
+        phone: '+91-0612-2345678',
+        email: 'info@magadhmahila.ac.in',
+        website: 'www.magadhmahila.ac.in',
+        affiliation: 'Magadh University',
+        established_year: 1962,
+        about: 'Premier women\'s college in Bihar dedicated to empowering women through quality education in arts, science, and commerce.'
+      }
+    ];
+
+    for (const college of colleges) {
+      await db('colleges').insert(college);
+    }
+
+    // 2.6. Insert Principals
+    console.log('👩‍💼 Inserting principals...');
+    const principals = [
+      {
+        id: 1,
+        name: 'Dr. Priya Sharma',
+        email: 'priya.sharma@magadhmahila.ac.in',
+        college_id: 1,
+        phone: '+91-9876543210',
+        qualification: 'Ph.D. in English Literature, Patna University',
+        experience: '20+ years in Women\'s Education',
+        employee_id: 'MMC001',
+        join_date: '2018-07-15',
+        about: 'Dedicated educator and advocate for women\'s empowerment with expertise in literature and gender studies.'
+      }
+    ];
+
+    for (const principal of principals) {
+      await db('principals').insert(principal);
     }
 
     // 3. Insert Classrooms (Legacy table - for backward compatibility)
@@ -797,6 +883,8 @@ async function populateCompleteDemoData() {
 📊 Demo Data Summary:
 • ${departments.length} Departments (CS & Math)
 • ${faculty.length} Faculty Members (5 CS + 5 Math including HODs)
+• ${colleges.length} College (Magadh Mahila College)
+• ${principals.length} Principal (Dr. Priya Sharma at Magadh Mahila College)
 • ${subjects.length} Subjects/Courses (7 CS + 5 Math)
 • ${classrooms.length} Classrooms (4 CS + 4 Math + 2 Shared)
 • ${resources.length} Resources (4 CS + 4 Math + 2 Shared) - IDs SYNCHRONIZED ✅
@@ -806,6 +894,7 @@ async function populateCompleteDemoData() {
 
 🎯 Ready for Testing:
 • HOD Login: Computer Science or Mathematics
+• Principal Login: Magadh Mahila College
 • Resource Management & Booking
 • Class Scheduling & Timetable Generation
 • Cross-Department Resource Requests
@@ -815,6 +904,7 @@ async function populateCompleteDemoData() {
 🔧 Login Credentials for Testing:
 • CS HOD: Dr. Rajesh Kumar Singh (rajesh.singh@biharuniv.edu)
 • Math HOD: Dr. Priya Sharma (priya.sharma@biharuniv.edu)
+• Principal: Dr. Priya Sharma (priya.sharma@magadhmahila.ac.in)
     `);
 
   } catch (error) {
