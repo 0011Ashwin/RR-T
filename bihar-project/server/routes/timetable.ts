@@ -8,10 +8,16 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const timetables = await TimetableModel.getAll();
-    res.json(timetables);
+    res.json({
+      success: true,
+      data: timetables
+    });
   } catch (error) {
     console.error('Error fetching timetables:', error);
-    res.status(500).json({ error: 'Failed to fetch timetables' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch timetables' 
+    });
   }
 });
 
@@ -22,13 +28,22 @@ router.get('/:id', async (req, res) => {
     const timetable = await TimetableModel.getWithEntries(id);
     
     if (!timetable) {
-      return res.status(404).json({ error: 'Timetable not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Timetable not found' 
+      });
     }
     
-    res.json(timetable);
+    res.json({
+      success: true,
+      data: timetable
+    });
   } catch (error) {
     console.error('Error fetching timetable:', error);
-    res.status(500).json({ error: 'Failed to fetch timetable' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch timetable' 
+    });
   }
 });
 

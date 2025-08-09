@@ -19,7 +19,7 @@ export interface Resource {
 export class ResourceModel {
   static async getAll() {
     return db('resources')
-      .join('departments', 'resources.department_id', 'departments.id')
+      .leftJoin('departments', 'resources.department_id', 'departments.id')
       .select('resources.*', 'departments.name as department_name')
       .then(resources => {
         return resources.map(resource => ({
@@ -27,11 +27,11 @@ export class ResourceModel {
           id: resource.id,
           name: resource.name,
           type: resource.type,
-          department: resource.department_name,
+          department: resource.department_name || 'University', // Default to 'University' for shared resources
           capacity: resource.capacity,
           description: resource.description,
           location: resource.location,
-          isShared: resource.is_shared,
+          isShared: resource.department_id === null, // Mark as shared if department_id is null
           isActive: resource.is_active,
           equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
           facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
@@ -131,14 +131,13 @@ export class ResourceModel {
 
   static async getSharedResources() {
     return db('resources')
-      .join('departments', 'resources.department_id', 'departments.id')
-      .where('resources.is_shared', true)
-      .select('resources.*', 'departments.name as department_name')
+      .whereNull('department_id') // Shared resources have null department_id
+      .select('*')
       .then(resources => {
         return resources.map(resource => ({
           ...resource,
-          department: resource.department_name,
-          isShared: resource.is_shared,
+          department: 'University', // Mark shared resources as 'University'
+          isShared: true,
           isActive: resource.is_active,
           equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
           facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],

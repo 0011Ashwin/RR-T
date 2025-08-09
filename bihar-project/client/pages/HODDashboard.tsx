@@ -501,7 +501,7 @@ export default function HODDashboard() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-8 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-7 bg-white/80 backdrop-blur-sm">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
@@ -536,13 +536,6 @@ export default function HODDashboard() {
             >
               <Send className="h-4 w-4 mr-2" />
               Requests
-            </TabsTrigger>
-            <TabsTrigger
-              value="resource-requests"
-              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Inter-Dept
             </TabsTrigger>
             <TabsTrigger
               value="faculty"

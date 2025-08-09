@@ -48,7 +48,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { GraduationCap, User, Shield, ChevronDown } from "lucide-react";
 import { toast } from 'sonner';
 import { HODService } from '@/services/hod-service';
-import { PrincipalService } from '@/services/principal-service';
 import { useHODAuth } from '@/hooks/use-hod-auth';
 import {
   Dialog,
@@ -182,15 +181,26 @@ export default function Index() {
   const loadPrincipals = async () => {
     setPrincipalsLoading(true);
     try {
-      console.log('🔍 Loading Principals from database...');
-      const response = await PrincipalService.getAllPrincipals();
-      console.log('📊 Principal Service Response:', response);
-      if (response.success && response.data) {
-        console.log('✅ Principals loaded successfully:', response.data);
-        setPrincipals(response.data);
-      } else {
-        console.log('❌ Failed to load Principals:', response.message);
-      }
+      console.log('🔍 Loading Principals from static data...');
+      // Use static Principal data for demo purposes
+      const staticPrincipals = [
+        {
+          id: '1',
+          name: 'Dr. Priya Sharma',
+          email: 'priya.sharma@magadhmahila.ac.in',
+          college: 'Magadh Mahila College',
+          qualification: 'Ph.D. in English Literature',
+          experience: '20+ years in Women\'s Education',
+          employeeId: 'MMC001',
+          joinDate: '2018-07-15',
+          phone: '+91-9876543210',
+          about: 'Dedicated educator and advocate for women\'s empowerment',
+          isActive: true
+        }
+      ];
+      
+      console.log('✅ Principals loaded successfully:', staticPrincipals);
+      setPrincipals(staticPrincipals);
     } catch (error) {
       console.error('❌ Error loading Principals:', error);
     } finally {
@@ -207,34 +217,22 @@ export default function Index() {
       setIsLoading(true);
       console.log('🚀 Starting quick login for Principal:', principal.name);
       
-      const response = await PrincipalService.login(principal.email);
+      // Use client-side authentication for consistency
+      localStorage.setItem('currentPrincipalId', principal.id);
+      localStorage.setItem('userRole', 'admin');
+      localStorage.setItem('adminType', 'principal');
+      localStorage.setItem('userEmail', principal.email);
+      localStorage.setItem('principalEmail', principal.email);
+      localStorage.setItem('principalName', principal.name);
+      localStorage.setItem('principalCollege', principal.college);
       
-      if (response.success && response.data) {
-        console.log('✅ Principal login successful');
-        
-        // Set localStorage items for principal session
-        localStorage.setItem('userRole', 'admin');
-        localStorage.setItem('adminType', 'principal');
-        localStorage.setItem('userEmail', principal.email);
-        localStorage.setItem('principalName', principal.name);
-        localStorage.setItem('principalCollege', principal.college);
-        localStorage.setItem('currentPrincipalId', principal.id);
-        
-        console.log('💾 Principal localStorage set, closing dialog...');
-        setLoginOpen(false);
-        
-        console.log('🧭 Navigating to /principal...');
-        toast.success(`Logged in as ${principal.name}!`);
-        
-        navigate('/principal');
-        console.log('✅ Navigation completed');
-      } else {
-        console.error('❌ Principal login failed:', response.message);
-        toast.error('Quick login failed');
-      }
+      console.log('✅ Principal authentication successful:', principal);
+      toast.success(`Welcome ${principal.name}!`);
+      setLoginOpen(false);
+      navigate('/principal');
     } catch (error) {
       console.error('❌ Principal quick login error:', error);
-      toast.error('Quick login failed');
+      toast.error('Quick login failed. Please try manual login.');
     } finally {
       setIsLoading(false);
     }
@@ -356,32 +354,39 @@ export default function Index() {
             setLoginOpen(false);
             navigate('/university');
         } else if (adminSubRole === 'principal') {
-          // Principal login - using client-side authentication for demo
+          // Principal login - using reliable client-side authentication for demo
           console.log('Attempting Principal authentication');
 
-          try {
-            const response = await PrincipalService.login(credentials.email);
-            
-            if (response.success && response.data && credentials.password === 'principal123') {
-              // Valid Principal credentials
-              const principalData = response.data;
-              localStorage.setItem('currentPrincipalId', principalData.id);
-              localStorage.setItem('userRole', 'admin');
-              localStorage.setItem('adminType', 'principal');
-              localStorage.setItem('userEmail', credentials.email);
-              localStorage.setItem('principalName', principalData.name);
-              localStorage.setItem('principalCollege', principalData.college);
-
-              console.log('Principal authentication successful:', principalData);
-              toast.success(`Welcome ${principalData.name}!`);
-              setLoginOpen(false);
-              navigate('/principal');
-            } else {
-              setError('Invalid Principal credentials. Please use a valid Principal email and password "principal123".');
+          // Define valid Principal accounts
+          const validPrincipals = {
+            'priya.sharma@magadhmahila.ac.in': { 
+              id: '1', 
+              name: 'Dr. Priya Sharma', 
+              college: 'Magadh Mahila College',
+              qualification: 'Ph.D. in English Literature',
+              experience: '20+ years in Women\'s Education',
+              employeeId: 'MMC001'
             }
-          } catch (error) {
-            console.error('Principal login error:', error);
-            setError('Principal login failed. Please try again.');
+          };
+
+          const principalAccount = validPrincipals[credentials.email.toLowerCase()];
+
+          if (principalAccount && credentials.password === 'principal123') {
+            // Valid Principal credentials
+            localStorage.setItem('currentPrincipalId', principalAccount.id);
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('adminType', 'principal');
+            localStorage.setItem('userEmail', credentials.email);
+            localStorage.setItem('principalEmail', credentials.email);
+            localStorage.setItem('principalName', principalAccount.name);
+            localStorage.setItem('principalCollege', principalAccount.college);
+
+            console.log('Principal authentication successful:', principalAccount);
+            toast.success(`Welcome ${principalAccount.name}!`);
+            setLoginOpen(false);
+            navigate('/principal');
+          } else {
+            setError('Invalid Principal credentials. Please use a valid Principal email and password "principal123".');
           }
           } else {
             // Check if it's one of the predefined admin accounts

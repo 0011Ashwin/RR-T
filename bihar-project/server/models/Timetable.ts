@@ -36,11 +36,16 @@ export interface TimetableEntryWithDetails extends TimetableEntry {
 
 export class TimetableModel {
   static async getAll() {
-    const timetables = await db('timetables').select('*');
+    const timetables = await db('timetables')
+      .join('departments', 'timetables.department_id', 'departments.id')
+      .select('timetables.*', 'departments.name as department_name')
+      .orderBy('timetables.created_at', 'desc');
+    
     return timetables.map(timetable => ({
       ...timetable,
       academicYear: timetable.academic_year,
       numberOfStudents: timetable.number_of_students,
+      department: timetable.department_name
     }));
   }
 

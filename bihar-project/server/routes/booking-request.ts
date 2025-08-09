@@ -22,6 +22,28 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Get booking requests for shared resources (targetResourceId = '0') - MUST BE BEFORE /:id route
+router.get('/shared-resources', async (req, res) => {
+  try {
+    const bookingRequests = await BookingRequestModel.getAll();
+    // Filter requests for shared resources (resource ID 0 or null department)
+    const sharedResourceRequests = bookingRequests.filter(req => 
+      req.targetResourceId === '0' || req.targetDepartment === 'University');
+    
+    res.json({
+      success: true,
+      data: sharedResourceRequests,
+      total: sharedResourceRequests.length
+    });
+  } catch (error) {
+    console.error('Error fetching shared resource requests:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch shared resource requests' 
+    });
+  }
+});
+
 // Get booking request by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -402,6 +424,63 @@ router.put('/:id/vc-approval', async (req, res) => {
       success: false, 
       message: 'Failed to update VC approval status', 
       error: error.message 
+    });
+  }
+});
+
+// Approve or reject a shared resource request (Principal functionality)
+router.patch('/shared-resources/:id/approve', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { status, approvedBy, notes } = req.body;
+    
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid status (approved/rejected) is required'
+      });
+    }
+    
+    if (!approvedBy) {
+      return res.status(400).json({
+        success: false,
+        message: 'Approver name is required'
+      });
+    }
+    
+    // Check if the booking request exists and is for a shared resource
+    const bookingRequest = await BookingRequestModel.getById(id);
+    if (!bookingRequest) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Booking request not found' 
+      });
+    }
+    
+    if (bookingRequest.targetResourceId !== '0' && bookingRequest.targetDepartment !== 'University') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This is not a shared resource request' 
+      });
+    }
+    
+    const updatedRequest = await BookingRequestModel.updateStatus(id, {
+      status,
+      approvedBy,
+      responseDate: new Date().toISOString(),
+      notes: notes || ''
+    });
+    
+    res.json({
+      success: true,
+      data: updatedRequest,
+      message: `Request ${status} successfully`
+    });
+  } catch (error) {
+    console.error('Error updating shared resource request:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update shared resource request' 
     });
   }
 });

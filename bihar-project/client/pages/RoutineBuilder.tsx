@@ -229,7 +229,8 @@ export default function RoutineBuilder() {
 
     const fetchResources = async () => {
       try {
-        const response = await ResourceService.getResourcesByDepartment(currentHOD.department);
+        // Fetch all resources so HODs can see and request resources from other departments
+        const response = await ResourceService.getAllResources();
         if (response.success && response.data) {
           setResources(response.data);
         }
@@ -335,7 +336,7 @@ export default function RoutineBuilder() {
           console.log('Faculty loaded:', facultyResponse.data.data);
         }
 
-        // Load resources
+        // Load all resources so HODs can see and request resources from other departments
         const resourcesResponse = await ResourceService.getAllResources();
         if (resourcesResponse.success && resourcesResponse.data) {
           setResources(resourcesResponse.data);
@@ -508,32 +509,26 @@ export default function RoutineBuilder() {
       console.log('Relevant courses found:', relevantCourses.length, relevantCourses);
       console.log('Relevant resources found:', relevantResources.length, relevantResources);
 
-      // If no courses or resources, create empty routine but warn user
+      // Note: Routines are always created empty, but we can still inform about available courses/resources
       if (relevantCourses.length === 0) {
-        console.warn('No courses found for the department/semester/section');
+        console.info('No courses found for the department/semester/section');
         toast({
-          title: "Warning",
-          description: "No courses found for this department, semester, and section. Creating empty routine.",
+          title: "Info",
+          description: "No courses found for this department, semester, and section. You can add custom subjects when creating sessions.",
         });
       }
 
       if (relevantResources.length === 0) {
-        console.warn('No resources found for the department');
+        console.info('No resources found for the department');
         toast({
-          title: "Warning", 
-          description: "No resources found for this department. Creating routine without room assignments.",
+          title: "Info", 
+          description: "No resources found for this department. You can request resources from other departments when adding sessions.",
         });
       }
 
-      // Auto-generate sessions for the new configuration
+      // Start with empty sessions - user will add sessions manually
       let generatedSessions: ClassSession[] = [];
-      
-      if (relevantCourses.length > 0 && relevantResources.length > 0) {
-        generatedSessions = autoGenerateSessions(relevantCourses, relevantResources);
-        console.log('Generated sessions:', generatedSessions.length, generatedSessions);
-      } else {
-        console.log('Skipping session generation due to missing courses or resources');
-      }
+      console.log('Creating empty routine - no sessions will be pre-generated');
 
       // Create the timetable data for the API (without sessions initially)
       const timetableData = {
@@ -600,13 +595,9 @@ export default function RoutineBuilder() {
           numberOfStudents: 45,
         });
 
-        const sessionMessage = successfulSessions.length > 0 
-          ? ` with ${successfulSessions.length} sessions` 
-          : (generatedSessions.length > 0 ? ' (sessions had conflicts - routine created without sessions)' : '');
-
         toast({
           title: "Success",
-          description: `Routine created successfully${sessionMessage}!`,
+          description: "Empty routine created successfully! You can now add sessions manually.",
         });
 
         // Refresh data from database to ensure consistency
@@ -1727,20 +1718,36 @@ export default function RoutineBuilder() {
                     </SelectTrigger>
                     <SelectContent>
                       {resources
-                        .filter(r => r.type === 'classroom' || r.type === 'lab')
+                        .filter(r => 
+                          r.type === 'classroom' || 
+                          r.type === 'lab' || 
+                          r.type === 'seminar_hall' || 
+                          r.type === 'conference_room' || 
+                          r.type === 'library'
+                        )
                         .sort((a, b) => {
-                          // Sort department resources first, then other resources
+                          // Sort: own department > shared/university > other departments
                           const aIsDepartment = a.department === currentHOD?.department;
                           const bIsDepartment = b.department === currentHOD?.department;
+                          const aIsShared = a.department === 'University' || a.isShared || !a.department;
+                          const bIsShared = b.department === 'University' || b.isShared || !b.department;
                           
+                          // Own department resources first
                           if (aIsDepartment && !bIsDepartment) return -1;
                           if (!aIsDepartment && bIsDepartment) return 1;
                           
-                          // Within same category (department vs non-department), sort by name
+                          // If neither is own department, prioritize shared resources over other departments
+                          if (!aIsDepartment && !bIsDepartment) {
+                            if (aIsShared && !bIsShared) return -1;
+                            if (!aIsShared && bIsShared) return 1;
+                          }
+                          
+                          // Within same category, sort by name
                           return a.name.localeCompare(b.name);
                         })
                         .map(resource => {
                           const isOwnDepartment = resource.department === currentHOD?.department;
+                          const isShared = resource.department === 'University' || resource.isShared || !resource.department;
                           const capacityWarning = resource.capacity < (selectedRoutine?.numberOfStudents || 0);
                           const isAvailable = isResourceAvailable(resource.id!.toString());
                           
@@ -1756,7 +1763,7 @@ export default function RoutineBuilder() {
                                   {!isAvailable && ' - Occupied'}
                                   {!isOwnDepartment && (
                                     <Badge variant="outline" className="ml-2 text-xs">
-                                      {resource.department}
+                                      {isShared ? 'University' : resource.department}
                                     </Badge>
                                   )}
                                 </span>
@@ -1775,16 +1782,26 @@ export default function RoutineBuilder() {
                     if (!selectedResource) return null;
                     
                     const isOwnDepartment = selectedResource.department === currentHOD?.department;
+                    const isShared = selectedResource.department === 'University' || selectedResource.isShared || !selectedResource.department;
                     const capacityWarning = selectedResource.capacity < (selectedRoutine?.numberOfStudents || 0);
                     
                     return (
                       <div className="mt-2 space-y-2">
-                        {!isOwnDepartment && (
+                        {!isOwnDepartment && !isShared && (
                           <Alert className="border-orange-200 bg-orange-50">
                             <AlertTriangle className="h-4 w-4 text-orange-500" />
                             <AlertDescription className="text-orange-800">
                               This resource belongs to <strong>{selectedResource.department}</strong> department. 
                               A booking request will be sent for approval.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        
+                        {isShared && !isOwnDepartment && (
+                          <Alert className="border-blue-200 bg-blue-50">
+                            <AlertTriangle className="h-4 w-4 text-blue-500" />
+                            <AlertDescription className="text-blue-800">
+                              This is a shared university resource available to all departments.
                             </AlertDescription>
                           </Alert>
                         )}

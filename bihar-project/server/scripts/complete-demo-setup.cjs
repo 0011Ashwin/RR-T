@@ -378,6 +378,17 @@ async function populateCompleteDemoData() {
     // 3. Insert Classrooms (Legacy table - for backward compatibility)
     console.log('🏫 Inserting classrooms...');
     const classrooms = [
+      // Shared University Classroom (Always ID 0)
+      { 
+        id: 0,
+        name: 'University Library', 
+        room_number: 'LIB-001', 
+        capacity: 200, 
+        floor: 1, 
+        building: 'Central Library', 
+        type: 'library',
+        department_id: null 
+      },
       // Computer Science Classrooms
       { 
         id: 1,
@@ -464,7 +475,7 @@ async function populateCompleteDemoData() {
 
       // Shared University Resources
       { 
-        id: 9,
+        id: 10,
         name: 'Main Auditorium', 
         room_number: 'AUD-001', 
         capacity: 500, 
@@ -474,7 +485,7 @@ async function populateCompleteDemoData() {
         department_id: null 
       },
       { 
-        id: 10,
+        id: 11,
         name: 'Conference Hall', 
         room_number: 'CONF-001', 
         capacity: 100, 
@@ -492,6 +503,20 @@ async function populateCompleteDemoData() {
     // 4. Insert Resources (Modern resource management)
     console.log('🏗️ Inserting resources...');
     const resources = [
+      // Shared University Resource (Always ID 0)
+      { 
+        id: 0,
+        name: 'University Library', 
+        type: 'library', 
+        capacity: 200, 
+        department_id: null,
+        building: 'Central Library',
+        floor: 1,
+        location: 'Central Library, Ground Floor',
+        equipment: JSON.stringify(['Reading Tables', 'Computer Terminals', 'Wifi', 'Books', 'Journals', 'Study Rooms']),
+        facilities: JSON.stringify(['Silent Study Area', 'Group Study Rooms', 'Computer Access', 'AC', 'Parking']),
+        is_active: true 
+      },
       // Computer Science Resources
       { 
         id: 1,
@@ -602,7 +627,7 @@ async function populateCompleteDemoData() {
 
       // Shared University Resources
       { 
-        id: 9,
+        id: 10,
         name: 'Main Auditorium', 
         type: 'seminar_hall', 
         capacity: 500, 
@@ -615,7 +640,7 @@ async function populateCompleteDemoData() {
         is_active: true 
       },
       { 
-        id: 10,
+        id: 11,
         name: 'Conference Hall', 
         type: 'conference_room', 
         capacity: 100, 
@@ -820,40 +845,10 @@ async function populateCompleteDemoData() {
       await db('timetable_entries').insert(entry);
     }
 
-    // 8. Insert Sample Booking Requests
-    console.log('📋 Inserting sample booking requests...');
+    // 8. Insert Sample Booking Requests (removed fake data - will be populated by real usage)
+    console.log('📋 Preparing for real booking requests...');
     const bookingRequests = [
-      {
-        id: 'req_demo_1',
-        requesterId: 'Dr. Rajesh Kumar Singh',
-        requesterDepartment: 'Computer Science',
-        targetResourceId: '9', // Main Auditorium
-        targetDepartment: 'University',
-        timeSlotId: 'morning_1',
-        dayOfWeek: 3, // Wednesday
-        courseName: 'CS Department Seminar',
-        purpose: 'Annual CS Department Seminar on Artificial Intelligence',
-        expectedAttendance: 200,
-        requestDate: new Date().toISOString(),
-        status: 'pending',
-      },
-      {
-        id: 'req_demo_2', 
-        requesterId: 'Dr. Priya Sharma',
-        requesterDepartment: 'Mathematics',
-        targetResourceId: '10', // Conference Hall
-        targetDepartment: 'University',
-        timeSlotId: 'afternoon_1',
-        dayOfWeek: 5, // Friday
-        courseName: 'Faculty Meeting',
-        purpose: 'Mathematics Department Faculty Meeting',
-        expectedAttendance: 15,
-        requestDate: new Date().toISOString(),
-        status: 'approved',
-        approvedBy: 'Dr. Admin',
-        responseDate: new Date().toISOString(),
-        notes: 'Approved for regular faculty meeting',
-      },
+      // Real booking requests will be created when users actually use the system
     ];
 
     for (const request of bookingRequests) {
@@ -886,8 +881,8 @@ async function populateCompleteDemoData() {
 • ${colleges.length} College (Magadh Mahila College)
 • ${principals.length} Principal (Dr. Priya Sharma at Magadh Mahila College)
 • ${subjects.length} Subjects/Courses (7 CS + 5 Math)
-• ${classrooms.length} Classrooms (4 CS + 4 Math + 2 Shared)
-• ${resources.length} Resources (4 CS + 4 Math + 2 Shared) - IDs SYNCHRONIZED ✅
+• ${classrooms.length} Classrooms (1 Shared + 4 CS + 4 Math + 2 University)
+• ${resources.length} Resources (1 Shared + 4 CS + 4 Math + 2 University) - IDs SYNCHRONIZED ✅
 • ${timetables.length} Timetables (2 CS + 2 Math)
 • ${entries.length} Timetable Entries (reduced conflicts for testing)
 • ${bookingRequests.length} Booking Requests
