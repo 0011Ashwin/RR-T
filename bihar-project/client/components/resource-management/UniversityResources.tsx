@@ -363,7 +363,7 @@ export default function UniversityResources() {
         <div>
           <h2 className="text-2xl font-bold text-slate-900 flex items-center">
             <University className="h-6 w-6 mr-3 text-indigo-600" />
-            University Resources
+            College Resources
           </h2>
           <p className="text-slate-600">View shared college-wide resources and request bookings</p>
         </div>

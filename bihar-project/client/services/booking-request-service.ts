@@ -153,5 +153,41 @@ export const BookingRequestService = {
         message: 'Failed to update VC approval status'
       };
     }
+  },
+
+  /**
+   * Get shared resource requests (for Principal approval)
+   */
+  getSharedResourceRequests: async (): Promise<BookingRequestListResponse> => {
+    try {
+      const response = await axios.get<BookingRequestListResponse>(`${API_URL}/shared-resources`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching shared resource requests:', error);
+      return {
+        success: false,
+        message: 'Failed to fetch shared resource requests'
+      };
+    }
+  },
+
+  /**
+   * Approve or reject a shared resource request (Principal functionality)
+   */
+  approveSharedResourceRequest: async (id: string, status: 'approved' | 'rejected', approvedBy: string, notes?: string): Promise<BookingRequestResponse> => {
+    try {
+      const response = await axios.patch<BookingRequestResponse>(`${API_URL}/shared-resources/${id}/approve`, {
+        status,
+        approvedBy,
+        notes
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating shared resource request ${id}:`, error);
+      return {
+        success: false,
+        message: 'Failed to update shared resource request'
+      };
+    }
   }
 };

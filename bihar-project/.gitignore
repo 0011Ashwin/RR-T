@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .config/
+
+# Database files (can be regenerated with complete-demo-setup.cjs)
+data/bihar_university.sqlite
+*.sqlite
+*.db

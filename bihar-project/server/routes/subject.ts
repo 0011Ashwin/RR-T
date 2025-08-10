@@ -80,12 +80,39 @@ router.get('/:id/faculty', async (req, res) => {
 // Create a new subject
 router.post('/', async (req, res) => {
   try {
-    const subject = req.body;
+    const { department, ...subjectData } = req.body;
+    
+    // If department is provided as a name, find the department_id
+    let departmentId = subjectData.department_id;
+    if (department && !departmentId) {
+      const db = require('../database/index.js').default;
+      const departmentRecord = await db('departments').where({ name: department }).first();
+      if (departmentRecord) {
+        departmentId = departmentRecord.id;
+      } else {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Department not found' 
+        });
+      }
+    }
+    
+    const subject = {
+      ...subjectData,
+      department_id: departmentId
+    };
+    
     const newSubject = await SubjectModel.create(subject);
-    res.status(201).json(newSubject);
+    res.status(201).json({
+      success: true,
+      data: newSubject
+    });
   } catch (error) {
     console.error('Error creating subject:', error);
-    res.status(500).json({ error: 'Failed to create subject' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to create subject' 
+    });
   }
 });
 

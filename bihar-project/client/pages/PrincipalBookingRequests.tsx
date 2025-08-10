@@ -1,46 +1,40 @@
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useHODAuth } from '@/hooks/use-hod-auth';
+import { useToast } from '@/hooks/use-toast';
 import { BookingRequest, Resource, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
-import { UpdateBookingRequestStatusRequest } from '../../shared/api';
 import { BookingRequestService } from '@/services/booking-request-service';
 import { ResourceService } from '@/services/resource-service';
-import { useToast } from '@/hooks/use-toast';
 import { 
-  Send,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertCircle,
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle, 
+  Building2, 
+  Calendar, 
+  Users, 
+  MapPin, 
+  Send, 
   MessageSquare,
-  Calendar,
-  Building2,
-  User,
-  Users,
-  MapPin,
-  Filter,
-  Search
+  AlertTriangle
 } from 'lucide-react';
-
-// Helper function to filter out internal data from notes
-const filterInternalData = (notes: string): string => {
-  if (!notes) return '';
-  // Remove anything between [INTERNAL_DATA] and [/INTERNAL_DATA] tags
-  return notes.replace(/\[INTERNAL_DATA\].*?\[\/INTERNAL_DATA\]/g, '').trim();
-};
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export default function BookingRequests() {
-  const { currentHOD, allHODs } = useHODAuth();
+export default function PrincipalBookingRequests() {
   const { toast } = useToast();
+  
+  // Get Principal authentication data from localStorage
+  const principalEmail = localStorage.getItem("principalEmail");
+  const principalName = localStorage.getItem("principalName");
+  const principalCollege = localStorage.getItem("principalCollege");
+
   const [activeTab, setActiveTab] = useState('received-pending');
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -50,35 +44,36 @@ export default function BookingRequests() {
   const [responseAction, setResponseAction] = useState<'approve' | 'reject'>('approve');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Check if Principal is authenticated
+  if (!principalEmail || !principalName) {
+    window.location.href = '/login';
+    return null;
+  }
+
+  const currentPrincipal = {
+    id: principalEmail,
+    name: principalName,
+    email: principalEmail,
+    college: principalCollege || 'Magadh Mahila College'
+  };
+
   // Fetch booking requests and resources from API
   useEffect(() => {
-    if (!currentHOD) return;
-    
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch requests where current department is the target
-        const receivedResponse = await BookingRequestService.getRequestsByTargetDepartment(currentHOD.department);
-        
-        // Fetch requests sent by current department
-        const sentResponse = await BookingRequestService.getRequestsByRequesterDepartment(currentHOD.department);
+        // Fetch shared resource requests (requests targeting University resources)
+        const sharedResponse = await BookingRequestService.getSharedResourceRequests();
         
         // Fetch all resources so we can display resource names
         const resourcesResponse = await ResourceService.getAllResources();
         
-        if (receivedResponse.success && sentResponse.success) {
-          const allRequests = [
-            ...(receivedResponse.data || []),
-            ...(sentResponse.data || [])
-          ];
-          
-          // Remove duplicates (in case a request appears in both lists)
-          const uniqueRequests = Array.from(new Map(allRequests.map(req => [req.id, req])).values());
-          setBookingRequests(uniqueRequests);
+        if (sharedResponse.success) {
+          setBookingRequests(sharedResponse.data || []);
         } else {
           toast({
             title: 'Error fetching requests',
-            description: receivedResponse.message || sentResponse.message,
+            description: sharedResponse.message,
             variant: 'destructive'
           });
         }
@@ -99,30 +94,17 @@ export default function BookingRequests() {
     };
     
     fetchData();
-  }, [currentHOD, toast]);
+  }, [toast]);
 
-  // Filter received requests
+  // Filter requests for shared resources (University resources)
   const receivedPendingRequests = bookingRequests.filter(req => 
-    req.targetDepartment === currentHOD?.department && 
-    req.requesterId !== currentHOD?.id && 
-    req.status === 'pending'
+    req.status === 'pending' &&
+    (req.targetResourceId === '0' || req.targetDepartment === 'University')
   );
 
   const receivedProcessedRequests = bookingRequests.filter(req => 
-    req.targetDepartment === currentHOD?.department && 
-    req.requesterId !== currentHOD?.id && 
-    req.status !== 'pending'
-  );
-
-  // Filter sent requests
-  const sentPendingRequests = bookingRequests.filter(req => 
-    req.requesterId === currentHOD?.id && 
-    req.status === 'pending'
-  );
-
-  const sentProcessedRequests = bookingRequests.filter(req => 
-    req.requesterId === currentHOD?.id && 
-    req.status !== 'pending'
+    req.status !== 'pending' &&
+    (req.targetResourceId === '0' || req.targetDepartment === 'University')
   );
 
   // Helper function to get resource name from ID
@@ -132,17 +114,16 @@ export default function BookingRequests() {
   };
 
   const handleResponse = async (action: 'approve' | 'reject') => {
-    if (!selectedRequest || !currentHOD) return;
+    if (!selectedRequest || !currentPrincipal) return;
     
     setIsLoading(true);
     try {
-      const statusUpdate: UpdateBookingRequestStatusRequest = {
-        status: action === 'approve' ? 'approved' : 'rejected',
-        approvedBy: currentHOD.id,
-        notes: responseText.trim() || undefined
-      };
-      
-      const response = await BookingRequestService.updateRequestStatus(selectedRequest.id, statusUpdate);
+      const response = await BookingRequestService.approveSharedResourceRequest(
+        selectedRequest.id,
+        action === 'approve' ? 'approved' : 'rejected',
+        currentPrincipal.name,
+        responseText.trim() || undefined
+      );
       
       if (response.success) {
         // Update the local state with the updated request
@@ -150,9 +131,13 @@ export default function BookingRequests() {
           req.id === selectedRequest.id ? response.data! : req
         ));
         
+        setResponseDialogOpen(false);
+        setResponseText('');
+        setSelectedRequest(null);
+        
         toast({
           title: `Request ${action === 'approve' ? 'Approved' : 'Rejected'}`,
-          description: `The booking request has been ${action === 'approve' ? 'approved' : 'rejected'} successfully.`,
+          description: `The shared resource request has been ${action === 'approve' ? 'approved' : 'rejected'} successfully.`,
           variant: 'default'
         });
       } else {
@@ -163,7 +148,7 @@ export default function BookingRequests() {
         });
       }
     } catch (error) {
-      console.error(`Error ${action}ing request:`, error);
+      console.error(`Error ${action} request:`, error);
       toast({
         title: 'Error',
         description: `Failed to ${action} the request. Please try again.`,
@@ -171,9 +156,6 @@ export default function BookingRequests() {
       });
     } finally {
       setIsLoading(false);
-      setResponseDialogOpen(false);
-      setSelectedRequest(null);
-      setResponseText('');
     }
   };
 
@@ -218,9 +200,10 @@ export default function BookingRequests() {
     return DEFAULT_TIME_SLOTS.find(t => t.id === timeSlotId)?.label || 'Unknown Time';
   };
 
-  const getRequesterName = (requesterId: string) => {
-    const hod = allHODs.find(h => h.id === requesterId);
-    return hod ? hod.name : 'Unknown HOD';
+  // Filter out any internal booking system metadata from notes
+  const filterInternalData = (notes: string | null | undefined): string => {
+    if (!notes) return '';
+    return notes.replace(/\[INTERNAL:.*?\]/g, '').trim();
   };
 
   return (
@@ -228,8 +211,8 @@ export default function BookingRequests() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Booking Requests</h1>
-          <p className="text-slate-600 mt-1">Manage cross-department resource booking requests</p>
+          <h1 className="text-3xl font-bold text-slate-900">Shared Resource Requests</h1>
+          <p className="text-slate-600 mt-1">Manage requests for university shared resources</p>
         </div>
       </div>
       
@@ -245,7 +228,7 @@ export default function BookingRequests() {
 
       {/* Request Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="received-pending" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
             <Clock className="h-4 w-4 mr-2" />
             Pending ({receivedPendingRequests.length})
@@ -253,14 +236,6 @@ export default function BookingRequests() {
           <TabsTrigger value="received-processed" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
             <MessageSquare className="h-4 w-4 mr-2" />
             Processed ({receivedProcessedRequests.length})
-          </TabsTrigger>
-          <TabsTrigger value="sent-pending" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
-            <Send className="h-4 w-4 mr-2" />
-            Sent Pending ({sentPendingRequests.length})
-          </TabsTrigger>
-          <TabsTrigger value="sent-processed" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Sent Processed ({sentProcessedRequests.length})
           </TabsTrigger>
         </TabsList>
 
@@ -272,7 +247,7 @@ export default function BookingRequests() {
                 <Clock className="h-12 w-12 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-slate-900 mb-2">No pending requests</h3>
                 <p className="text-slate-600">
-                  No departments are currently requesting to use your resources.
+                  No departments are currently requesting shared university resources.
                 </p>
               </CardContent>
             </Card>
@@ -319,7 +294,7 @@ export default function BookingRequests() {
                         </div>
 
                         <div className="text-sm text-slate-600 mb-3">
-                          <span className="font-medium">Requested by:</span> {getRequesterName(request.requesterId)}
+                          <span className="font-medium">Requested by:</span> {request.requesterId}
                         </div>
 
                         {request.purpose && (
@@ -334,7 +309,7 @@ export default function BookingRequests() {
 
                         {request.notes && filterInternalData(request.notes) && (
                           <div className="mt-3 p-3 bg-slate-50 rounded-lg">
-                            <div className="text-sm font-medium text-slate-700 mb-1">Response Notes:</div>
+                            <div className="text-sm font-medium text-slate-700 mb-1">Additional Notes:</div>
                             <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
                           </div>
                         )}
@@ -379,7 +354,7 @@ export default function BookingRequests() {
                 <CheckCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-slate-900 mb-2">No processed requests</h3>
                 <p className="text-slate-600">
-                  You haven't approved or rejected any requests yet.
+                  You haven't approved or rejected any shared resource requests yet.
                 </p>
               </CardContent>
             </Card>
@@ -426,7 +401,7 @@ export default function BookingRequests() {
                         </div>
 
                         <div className="text-sm text-slate-600 mb-3">
-                          <span className="font-medium">Requested by:</span> {getRequesterName(request.requesterId)}
+                          <span className="font-medium">Requested by:</span> {request.requesterId}
                         </div>
 
                         {request.purpose && (
@@ -452,225 +427,11 @@ export default function BookingRequests() {
                         )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Sent Pending Requests */}
-        <TabsContent value="sent-pending" className="space-y-4">
-          {sentPendingRequests.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Send className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">No pending sent requests</h3>
-                <p className="text-slate-600">
-                  You don't have any pending resource booking requests.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {sentPendingRequests.map(request => (
-                <Card key={request.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold text-slate-900">
-                            {request.courseName}
-                          </h3>
-                          <Badge className={`text-xs ${getStatusColor(request.status)}`}>
-                            <div className="flex items-center space-x-1">
-                              {getStatusIcon(request.status)}
-                              <span className="capitalize">{request.status}</span>
-                            </div>
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-slate-600 mb-3">
-                          <div className="flex items-center">
-                            <Building2 className="h-4 w-4 mr-2" />
-                            {request.targetDepartment}
-                          </div>
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            {DAYS[request.dayOfWeek]}
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-2" />
-                            {getTimeSlotLabel(request.timeSlotId)}
-                          </div>
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-2" />
-                            {getResourceName(request.targetResourceId)}
-                          </div>
-                          <div className="flex items-center">
-                            <Users className="h-4 w-4 mr-2" />
-                            {request.expectedAttendance} people
-                          </div>
-                        </div>
-
-                        {request.purpose && (
-                          <div className="text-sm text-slate-600 mb-3">
-                            <span className="font-medium">Purpose:</span> {request.purpose}
-                          </div>
-                        )}
-
-                        <div className="text-xs text-slate-500">
-                          Sent: {new Date(request.requestDate).toLocaleString()}
-                          {request.responseDate && (
-                            <span className="ml-4">
-                              Responded: {new Date(request.responseDate).toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-
-                        {request.notes && filterInternalData(request.notes) && (
-                          <div className="mt-3 p-3 bg-slate-50 rounded-lg">
-                            <div className="text-sm font-medium text-slate-700 mb-1">Response Notes:</div>
-                            <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
-                          </div>
-                        )}
+                    {request.status !== 'pending' && request.approvedBy && (
+                      <div className="text-xs text-slate-500 border-t pt-2">
+                        {request.status === 'approved' ? 'Approved' : 'Rejected'} by {request.approvedBy} on {new Date(request.responseDate || '').toLocaleDateString()}
                       </div>
-
-                      {request.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="ml-4 text-red-600 hover:text-red-700"
-                          disabled={isLoading}
-                          onClick={async () => {
-                            setIsLoading(true);
-                            try {
-                              const statusUpdate = {
-                                status: 'withdrawn' as const,
-                                notes: 'Request withdrawn by requester'
-                              };
-                              
-                              const response = await BookingRequestService.updateRequestStatus(request.id, statusUpdate);
-                              
-                              if (response.success) {
-                                // Update the local state with the updated request
-                                setBookingRequests(prev => prev.map(req => 
-                                  req.id === request.id ? response.data! : req
-                                ));
-                                
-                                toast({
-                                  title: 'Request Withdrawn',
-                                  description: 'The booking request has been withdrawn successfully.',
-                                  variant: 'default'
-                                });
-                              } else {
-                                toast({
-                                  title: 'Error',
-                                  description: response.message || 'Failed to withdraw the request.',
-                                  variant: 'destructive'
-                                });
-                              }
-                            } catch (error) {
-                              console.error('Error withdrawing request:', error);
-                              toast({
-                                title: 'Error',
-                                description: 'Failed to withdraw the request. Please try again.',
-                                variant: 'destructive'
-                              });
-                            } finally {
-                              setIsLoading(false);
-                            }
-                          }}
-                        >
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Withdraw
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Sent Processed Requests */}
-        <TabsContent value="sent-processed" className="space-y-4">
-          {sentProcessedRequests.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <CheckCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">No processed sent requests</h3>
-                <p className="text-slate-600">
-                  You don't have any approved, rejected, or withdrawn requests yet.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {sentProcessedRequests.map(request => (
-                <Card key={request.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold text-slate-900">
-                            {request.courseName}
-                          </h3>
-                          <Badge className={`text-xs ${getStatusColor(request.status)}`}>
-                            <div className="flex items-center space-x-1">
-                              {getStatusIcon(request.status)}
-                              <span className="capitalize">{request.status}</span>
-                            </div>
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-slate-600 mb-3">
-                          <div className="flex items-center">
-                            <Building2 className="h-4 w-4 mr-2" />
-                            {request.targetDepartment}
-                          </div>
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            {DAYS[request.dayOfWeek]}
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-2" />
-                            {getTimeSlotLabel(request.timeSlotId)}
-                          </div>
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-2" />
-                            {getResourceName(request.targetResourceId)}
-                          </div>
-                          <div className="flex items-center">
-                            <Users className="h-4 w-4 mr-2" />
-                            {request.expectedAttendance} people
-                          </div>
-                        </div>
-
-                        {request.purpose && (
-                          <div className="text-sm text-slate-600 mb-3">
-                            <span className="font-medium">Purpose:</span> {request.purpose}
-                          </div>
-                        )}
-
-                        <div className="text-xs text-slate-500">
-                          Sent: {new Date(request.requestDate).toLocaleString()}
-                          {request.responseDate && (
-                            <span className="ml-4">
-                              Responded: {new Date(request.responseDate).toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-
-                        {request.notes && filterInternalData(request.notes) && (
-                          <div className="mt-3 p-3 bg-slate-50 rounded-lg">
-                            <div className="text-sm font-medium text-slate-700 mb-1">Response Notes:</div>
-                            <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -717,10 +478,10 @@ export default function BookingRequests() {
             </div>
 
             <Alert>
-              <AlertCircle className="h-4 w-4" />
+              <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 {responseAction === 'approve' 
-                  ? 'Approving this request will make the resource unavailable for your department during the requested time slot.'
+                  ? 'Approving this request will make the shared resource unavailable during the requested time slot.'
                   : 'The requesting department will be notified of the rejection.'}
               </AlertDescription>
             </Alert>
@@ -748,11 +509,11 @@ export default function BookingRequests() {
                   </>
                 )}
               </Button>
-              <Button
-                variant="outline"
+              <Button 
+                variant="outline" 
                 onClick={() => setResponseDialogOpen(false)}
-                className="flex-1"
                 disabled={isLoading}
+                className="flex-1"
               >
                 Cancel
               </Button>

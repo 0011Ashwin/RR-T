@@ -111,6 +111,7 @@ export interface Routine {
   semester: number;
   section?: string;
   academicYear: string;
+  numberOfStudents?: number;
   sessions: ClassSession[];
   generatedBy: string; // HOD user ID
   generatedAt: string;
@@ -216,12 +217,15 @@ export interface ResourceStatistics {
 
 // Default time slots for the system
 export const DEFAULT_TIME_SLOTS: TimeSlot[] = [
-  { id: '1', startTime: '08:00', endTime: '09:30', duration: 90, label: '08:00-09:30' },
-  { id: '2', startTime: '09:30', endTime: '11:00', duration: 90, label: '09:30-11:00' },
-  { id: '3', startTime: '11:15', endTime: '12:45', duration: 90, label: '11:15-12:45' },
-  { id: '4', startTime: '12:45', endTime: '14:15', duration: 90, label: '12:45-14:15' },
-  { id: '5', startTime: '14:15', endTime: '15:45', duration: 90, label: '14:15-15:45' },
-  { id: '6', startTime: '15:45', endTime: '17:15', duration: 90, label: '15:45-17:15' },
+  { id: '1', startTime: '08:00', endTime: '09:00', duration: 60, label: '08:00-09:00' },
+  { id: '2', startTime: '09:00', endTime: '10:00', duration: 60, label: '09:00-10:00' },
+  { id: '3', startTime: '10:00', endTime: '11:00', duration: 60, label: '10:00-11:00' },
+  { id: '4', startTime: '11:00', endTime: '12:00', duration: 60, label: '11:00-12:00' },
+  { id: '5', startTime: '12:00', endTime: '13:00', duration: 60, label: '12:00-13:00' },
+  { id: '6', startTime: '13:00', endTime: '14:00', duration: 60, label: '13:00-14:00' },
+  { id: '7', startTime: '14:00', endTime: '15:00', duration: 60, label: '14:00-15:00' },
+  { id: '8', startTime: '15:00', endTime: '16:00', duration: 60, label: '15:00-16:00' },
+  { id: '9', startTime: '16:00', endTime: '17:00', duration: 60, label: '16:00-17:00' },
 ];
 
 // Sample HOD users for the system

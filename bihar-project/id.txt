@@ -12,4 +12,12 @@ Admin - Principal:
 
 Admin - HOD:
   Email: hod@example.com
-  Password: hod123 
+  Password: hod123
+
+Additional HODs (from demo data):
+  Email: rajesh.singh@biharuniv.edu (CS HOD)
+  Email: priya.sharma@biharuniv.edu (Math HOD)
+  Email: amit.singh@biharuniv.edu (Physics HOD)
+  Email: neha.gupta@biharuniv.edu (Chemistry HOD)
+  Email: sunita.rani@biharuniv.edu (English HOD)
+  Email: vikram.singh@biharuniv.edu (Geography HOD) 

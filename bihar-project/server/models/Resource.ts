@@ -19,10 +19,20 @@ export interface Resource {
 export class ResourceModel {
   static async getAll() {
     return db('resources')
-      .select('*')
+      .leftJoin('departments', 'resources.department_id', 'departments.id')
+      .select('resources.*', 'departments.name as department_name')
       .then(resources => {
         return resources.map(resource => ({
           ...resource,
+          id: resource.id,
+          name: resource.name,
+          type: resource.type,
+          department: resource.department_name || 'University', // Default to 'University' for shared resources
+          capacity: resource.capacity,
+          description: resource.description,
+          location: resource.location,
+          isShared: resource.department_id === null, // Mark as shared if department_id is null
+          isActive: resource.is_active,
           equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
           facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
         }));
@@ -56,15 +66,35 @@ export class ResourceModel {
       });
   }
 
+  static async getByDepartmentName(departmentName: string) {
+    return db('resources')
+      .join('departments', 'resources.department_id', 'departments.id')
+      .where('departments.name', departmentName)
+      .select('resources.*', 'departments.name as department_name')
+      .then(resources => {
+        return resources.map(resource => ({
+          ...resource,
+          department: resource.department_name,
+          isShared: resource.is_shared,
+          isActive: resource.is_active,
+          equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
+          facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
+        }));
+      });
+  }
+
   static async create(resource: Resource) {
+    // Remove any manually provided ID to ensure database auto-increment is used
+    const { id, ...resourceData } = resource;
+    
     const resourceToInsert = {
-      ...resource,
+      ...resourceData,
       equipment: resource.equipment ? JSON.stringify(resource.equipment) : null,
       facilities: resource.facilities ? JSON.stringify(resource.facilities) : null,
     };
     
-    const [id] = await db('resources').insert(resourceToInsert);
-    return this.getById(id);
+    const [newId] = await db('resources').insert(resourceToInsert);
+    return this.getById(newId);
   }
 
   static async update(id: number, resource: Partial<Resource>) {
@@ -93,6 +123,22 @@ export class ResourceModel {
       .then(resources => {
         return resources.map(resource => ({
           ...resource,
+          equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
+          facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
+        }));
+      });
+  }
+
+  static async getSharedResources() {
+    return db('resources')
+      .whereNull('department_id') // Shared resources have null department_id
+      .select('*')
+      .then(resources => {
+        return resources.map(resource => ({
+          ...resource,
+          department: 'University', // Mark shared resources as 'University'
+          isShared: true,
+          isActive: resource.is_active,
           equipment: resource.equipment ? JSON.parse(resource.equipment as string) : [],
           facilities: resource.facilities ? JSON.parse(resource.facilities as string) : [],
         }));

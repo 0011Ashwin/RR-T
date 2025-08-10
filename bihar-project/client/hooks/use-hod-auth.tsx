@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { HODUser, SAMPLE_HODS } from '../../shared/resource-types';
+import { HODUser } from '../../shared/resource-types';
+import { HODService } from '@/services/hod-service';
 
 interface HODAuthContextType {
   currentHOD: HODUser | null;
@@ -8,6 +9,7 @@ interface HODAuthContextType {
   logout: () => void;
   switchHOD: (hodId: string) => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const HODAuthContext = createContext<HODAuthContextType | undefined>(undefined);
@@ -18,88 +20,56 @@ interface HODAuthProviderProps {
 
 export const HODAuthProvider: React.FC<HODAuthProviderProps> = ({ children }) => {
   const [currentHOD, setCurrentHOD] = useState<HODUser | null>(null);
-  const [allHODs] = useState<HODUser[]>(SAMPLE_HODS);
+  const [allHODs, setAllHODs] = useState<HODUser[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load HOD from localStorage on mount
+  // Load HODs from database on mount
   useEffect(() => {
-    const savedHODId = localStorage.getItem('currentHODId');
-    if (savedHODId) {
-      fetchHODData(savedHODId);
-    }
+    const loadHODs = async () => {
+      setIsLoading(true);
+      try {
+        const response = await HODService.getAllHODs();
+        if (response.success && response.data) {
+          setAllHODs(response.data);
+        }
+      } catch (error) {
+        console.error('Error loading HODs:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadHODs();
   }, []);
 
-  const fetchHODData = async (hodId: string) => {
-    try {
-      // First check if we have client-side HOD data
-      const hodName = localStorage.getItem('hodName');
-      const hodDepartment = localStorage.getItem('hodDepartment');
-      const userEmail = localStorage.getItem('userEmail');
-
-      if (hodName && hodDepartment && userEmail) {
-        // Use client-side data
-        const clientSideHOD = {
-          id: hodId,
-          name: hodName,
-          email: userEmail,
-          designation: 'Head of Department',
-          department: hodDepartment,
-          employeeId: `HOD-${hodId}`,
-          joinDate: '2020-01-01',
-          experience: '10+ years',
-          avatar: null,
-          isActive: true,
-          phone: '+91-9876543210'
-        };
-        console.log('Using client-side HOD data:', clientSideHOD);
-        setCurrentHOD(clientSideHOD);
-        return;
-      }
-
-      // Fallback to backend API
-      const response = await fetch(`/api/hod-auth/profile/${hodId}`);
-      if (response.ok) {
-        const hodData = await response.json();
-        // Convert backend format to frontend format
-        const frontendHOD = {
-          id: hodData.id.toString(),
-          name: hodData.name,
-          email: hodData.email,
-          designation: hodData.designation,
-          department: hodData.department_name || 'Unknown Department',
-          employeeId: hodData.employee_id,
-          joinDate: hodData.join_date,
-          experience: hodData.experience,
-          avatar: hodData.avatar,
-          isActive: hodData.is_active,
-          phone: hodData.phone
-        };
-        setCurrentHOD(frontendHOD);
-      } else {
-        // If fetch fails, try to find in sample data
-        const hod = allHODs.find(h => h.id === hodId);
-        if (hod) {
-          setCurrentHOD(hod);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching HOD data:', error);
-      // Fallback to sample data
-      const hod = allHODs.find(h => h.id === hodId);
+  // Load current HOD from localStorage on mount
+  useEffect(() => {
+    const savedHODId = localStorage.getItem('currentHODId');
+    if (savedHODId && allHODs.length > 0) {
+      const hod = allHODs.find(h => h.id === savedHODId);
       if (hod) {
         setCurrentHOD(hod);
       }
     }
-  };
+  }, [allHODs]);
 
   const login = async (email: string): Promise<boolean> => {
-    const hod = allHODs.find(h => h.email === email && h.isActive);
-    if (hod) {
-      setCurrentHOD(hod);
-      localStorage.setItem('currentHODId', hod.id);
-      localStorage.setItem('userRole', 'hod');
-      return true;
+    setIsLoading(true);
+    try {
+      const response = await HODService.login(email);
+      if (response.success && response.data) {
+        setCurrentHOD(response.data);
+        localStorage.setItem('currentHODId', response.data.id);
+        localStorage.setItem('userRole', 'hod');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-    return false;
   };
 
   const logout = () => {
@@ -123,6 +93,7 @@ export const HODAuthProvider: React.FC<HODAuthProviderProps> = ({ children }) =>
     logout,
     switchHOD,
     isAuthenticated: currentHOD !== null,
+    isLoading,
   };
 
   return (

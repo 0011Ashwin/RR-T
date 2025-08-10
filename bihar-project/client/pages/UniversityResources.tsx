@@ -9,7 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useHODAuth } from '@/hooks/use-hod-auth';
+import { useToast } from '@/hooks/use-toast';
 import { Resource, WeeklyTimeSlot, BookingRequest, DEFAULT_TIME_SLOTS } from '../../shared/resource-types';
+import { ResourceService } from '@/services/resource-service';
+import { BookingRequestService } from '@/services/booking-request-service';
 import { 
   Building2, 
   Calendar, 
@@ -24,71 +27,19 @@ import {
   Plus
 } from 'lucide-react';
 
-const SAMPLE_SHARED_RESOURCES: Resource[] = [
-  {
-    id: 'shared_1',
-    name: 'Main Auditorium',
-    type: 'seminar_hall',
-    capacity: 500,
-    department: 'University',
-    location: 'Ground Floor, Main Building',
-    facilities: ['Projector', 'Audio System', 'AC', 'Stage'],
-    isShared: true,
-    isActive: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-01',
-  },
-  {
-    id: 'shared_2',
-    name: 'Conference Hall A',
-    type: 'conference_room',
-    capacity: 50,
-    department: 'University',
-    location: 'First Floor, Admin Building',
-    facilities: ['Video Conferencing', 'Smart Board', 'AC'],
-    isShared: true,
-    isActive: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-01',
-  },
-  {
-    id: 'shared_3',
-    name: 'Computer Lab - Central',
-    type: 'lab',
-    capacity: 60,
-    department: 'University',
-    location: 'Second Floor, IT Building',
-    facilities: ['60 Computers', 'Projector', 'Internet', 'AC'],
-    isShared: true,
-    isActive: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-01',
-  },
-  {
-    id: 'shared_4',
-    name: 'Seminar Hall B',
-    type: 'seminar_hall',
-    capacity: 100,
-    department: 'University',
-    location: 'Third Floor, Academic Block',
-    facilities: ['Projector', 'Audio System', 'AC'],
-    isShared: true,
-    isActive: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-01',
-  },
-];
-
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function UniversityResources() {
   const { currentHOD } = useHODAuth();
+  const { toast } = useToast();
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [selectedDay, setSelectedDay] = useState(1); // Monday
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [weeklySlots, setWeeklySlots] = useState<WeeklyTimeSlot[]>([]);
+  const [sharedResources, setSharedResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [bookingForm, setBookingForm] = useState({
     timeSlotId: '',
@@ -97,43 +48,69 @@ export default function UniversityResources() {
     expectedAttendance: '',
   });
 
+  // Load shared resources and booking requests from database
   useEffect(() => {
-    // Generate sample weekly slots with some occupied slots
-    const generateWeeklySlots = () => {
-      const slots: WeeklyTimeSlot[] = [];
+    const loadData = async () => {
+      if (!currentHOD) return;
       
-      SAMPLE_SHARED_RESOURCES.forEach(resource => {
-        DEFAULT_TIME_SLOTS.forEach(timeSlot => {
-          [1, 2, 3, 4, 5].forEach(day => { // Monday to Friday
-            const isOccupied = Math.random() < 0.3; // 30% occupied
-            slots.push({
-              id: `slot_${resource.id}_${timeSlot.id}_${day}`,
-              resourceId: resource.id,
-              timeSlotId: timeSlot.id,
-              dayOfWeek: day,
-              isOccupied,
-              occupiedBy: isOccupied ? {
-                courseId: `course_${Math.floor(Math.random() * 100)}`,
-                courseName: ['Physics Lab', 'Chemistry Practical', 'Department Meeting', 'Guest Lecture', 'Workshop'][Math.floor(Math.random() * 5)],
-                department: ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science'][Math.floor(Math.random() * 5)],
-                faculty: ['Dr. Smith', 'Prof. Johnson', 'Dr. Williams', 'Prof. Brown'][Math.floor(Math.random() * 4)],
-                classSize: Math.floor(Math.random() * 50) + 20,
-              } : undefined,
-              bookingDate: new Date().toISOString(),
-            });
+      setLoading(true);
+      try {
+        // Load shared resources
+        const resourcesResponse = await ResourceService.getSharedResources();
+        if (resourcesResponse.success && resourcesResponse.data) {
+          setSharedResources(resourcesResponse.data);
+          generateWeeklySlots(resourcesResponse.data);
+        }
+
+        // Load booking requests for current HOD
+        const sentRequestsResponse = await BookingRequestService.getRequestsByRequesterDepartment(currentHOD.department);
+        if (sentRequestsResponse.success && sentRequestsResponse.data) {
+          setBookingRequests(sentRequestsResponse.data);
+        }
+      } catch (error) {
+        console.error('Error loading university resources:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load university resources. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [currentHOD, toast]);
+
+  // Generate weekly time slots for resources
+  const generateWeeklySlots = (resources: Resource[]) => {
+    const slots: WeeklyTimeSlot[] = [];
+    
+    resources.forEach(resource => {
+      DEFAULT_TIME_SLOTS.forEach(timeSlot => {
+        [1, 2, 3, 4, 5].forEach(day => { // Monday to Friday
+          const isOccupied = Math.random() < 0.3; // 30% chance of being occupied
+          slots.push({
+            id: `${resource.id}_${timeSlot.id}_${day}`,
+            resourceId: resource.id!.toString(),
+            timeSlotId: timeSlot.id,
+            dayOfWeek: day,
+            isOccupied,
+            occupiedBy: isOccupied ? {
+              courseId: `course_${Math.floor(Math.random() * 10)}`,
+              courseName: `Sample Course ${Math.floor(Math.random() * 10) + 1}`,
+              department: 'Sample Department',
+              faculty: 'Dr. Sample Faculty',
+              classSize: Math.floor(Math.random() * 50) + 20,
+            } : undefined,
+            bookingDate: new Date().toISOString(),
           });
         });
       });
-      
-      setWeeklySlots(slots);
-    };
-
-    generateWeeklySlots();
-  }, []);
-
-  const filteredResources = SAMPLE_SHARED_RESOURCES.filter(resource => 
-    filterType === 'all' || resource.type === filterType
-  );
+    });
+    
+    setWeeklySlots(slots);
+  };
 
   const getSlotForResource = (resourceId: string, timeSlotId: string, day: number) => {
     return weeklySlots.find(slot => 
@@ -143,32 +120,58 @@ export default function UniversityResources() {
     );
   };
 
-  const handleBookingRequest = () => {
+  const filteredResources = sharedResources.filter(resource => 
+    filterType === 'all' || resource.type === filterType
+  );
+
+  const handleBookingRequest = async () => {
     if (!selectedResource || !currentHOD) return;
 
-    const newRequest: BookingRequest = {
-      id: `request_${Date.now()}`,
-      requesterId: currentHOD.id,
-      requesterDepartment: currentHOD.department,
-      targetResourceId: selectedResource.id,
-      targetDepartment: selectedResource.department,
-      timeSlotId: bookingForm.timeSlotId,
-      dayOfWeek: selectedDay,
-      courseName: bookingForm.courseName,
-      purpose: bookingForm.purpose,
-      expectedAttendance: parseInt(bookingForm.expectedAttendance),
-      requestDate: new Date().toISOString(),
-      status: 'pending',
-    };
+    try {
+      const newRequest = {
+        requesterId: currentHOD.id,
+        requesterDepartment: currentHOD.department,
+        requesterDesignation: currentHOD.designation, // Added for auto-approval logic
+        targetResourceId: selectedResource.id!.toString(),
+        targetDepartment: selectedResource.department,
+        timeSlotId: bookingForm.timeSlotId,
+        dayOfWeek: selectedDay,
+        courseName: bookingForm.courseName,
+        purpose: bookingForm.purpose,
+        expectedAttendance: parseInt(bookingForm.expectedAttendance),
+      };
 
-    setBookingRequests(prev => [...prev, newRequest]);
-    setBookingDialogOpen(false);
-    setBookingForm({
-      timeSlotId: '',
-      courseName: '',
-      purpose: '',
-      expectedAttendance: '',
-    });
+      const response = await BookingRequestService.createRequest(newRequest);
+      
+      if (response.success && response.data) {
+        setBookingRequests(prev => [...prev, response.data!]);
+        setBookingDialogOpen(false);
+        setBookingForm({
+          timeSlotId: '',
+          courseName: '',
+          purpose: '',
+          expectedAttendance: '',
+        });
+        
+        toast({
+          title: "Success",
+          description: "Booking request submitted successfully!",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to submit booking request.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting booking request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit booking request. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusColor = (status: WeeklyTimeSlot['isOccupied']) => {
@@ -193,7 +196,7 @@ export default function UniversityResources() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">University Resources</h1>
+          <h1 className="text-3xl font-bold text-slate-900">College Resources</h1>
           <p className="text-slate-600 mt-1">Shared facilities available for booking</p>
         </div>
         <div className="flex items-center space-x-3">
@@ -323,7 +326,7 @@ export default function UniversityResources() {
                           </SelectTrigger>
                           <SelectContent>
                             {DEFAULT_TIME_SLOTS.map(slot => {
-                              const weeklySlot = getSlotForResource(selectedResource.id, slot.id, selectedDay);
+                              const weeklySlot = getSlotForResource(selectedResource.id!.toString(), slot.id, selectedDay);
                               const isOccupied = weeklySlot?.isOccupied;
                               
                               return (
@@ -406,7 +409,7 @@ export default function UniversityResources() {
             <div className="space-y-4">
               <div className="grid grid-cols-6 gap-3">
                 {DEFAULT_TIME_SLOTS.map(timeSlot => {
-                  const slot = getSlotForResource(selectedResource.id, timeSlot.id, selectedDay);
+                  const slot = getSlotForResource(selectedResource.id!.toString(), timeSlot.id, selectedDay);
                   
                   return (
                     <div
@@ -450,7 +453,7 @@ export default function UniversityResources() {
                     <div>
                       <div className="font-medium">{request.courseName}</div>
                       <div className="text-sm text-slate-600">
-                        {SAMPLE_SHARED_RESOURCES.find(r => r.id === request.targetResourceId)?.name} • 
+                        {sharedResources.find(r => r.id!.toString() === request.targetResourceId)?.name} • 
                         {DAYS[request.dayOfWeek]} • 
                         {DEFAULT_TIME_SLOTS.find(t => t.id === request.timeSlotId)?.label}
                       </div>

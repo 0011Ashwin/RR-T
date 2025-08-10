@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import UniversityDashboard from "./pages/UniversityDashboard";
 import CollegeDashboard from "./pages/CollegeDashboard";
+import PrincipalDashboard from "./pages/PrincipalDashboard";
 import StudentDashboard from "./pages/EnhancedStudentDashboard";
 import HODDashboard from "./pages/HODDashboard";
 
@@ -33,7 +34,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/university" element={<UniversityDashboard />} />
-            <Route path="/principal" element={<CollegeDashboard />} />
+            <Route path="/principal" element={<PrincipalDashboard />} />
+            <Route path="/college" element={<CollegeDashboard />} />
             <Route path="/department" element={<HODDashboard />} />
 
             <Route path="/resources" element={<Resources />} />

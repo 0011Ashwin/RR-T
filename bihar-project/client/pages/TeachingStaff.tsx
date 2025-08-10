@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,79 +16,59 @@ import {
   BookOpen,
   Calendar,
   MapPin,
+  Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { FacultyService, Faculty } from "@/services/faculty-service";
+import { useToast } from "@/hooks/use-toast";
 
 export default function TeachingStaff() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [teachingStaffData, setTeachingStaffData] = useState<Faculty[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const teachingStaffData = [
-    {
-      id: "T001",
-      name: "Dr. Rajesh Kumar",
-      designation: "Professor",
-      department: "Computer Science",
-      subject: "Data Structures & Algorithms",
-      qualification: "Ph.D in Computer Science",
-      experience: "15 years",
-      email: "rajesh.kumar@bncollege.edu",
-      phone: "+91-9876543210",
-      joiningDate: "2008-07-15",
-      status: "Active",
-    },
-    {
-      id: "T002",
-      name: "Prof. Sunita Sharma",
-      designation: "Associate Professor",
-      department: "Business Administration",
-      subject: "Marketing Management",
-      qualification: "MBA, Ph.D",
-      experience: "12 years",
-      email: "sunita.sharma@bncollege.edu",
-      phone: "+91-9876543211",
-      joiningDate: "2011-03-22",
-      status: "Active",
-    },
-    {
-      id: "T003",
-      name: "Dr. Amit Patel",
-      designation: "Assistant Professor",
-      department: "Science",
-      subject: "Physics & Mathematics",
-      qualification: "M.Sc, Ph.D in Physics",
-      experience: "8 years",
-      email: "amit.patel@bncollege.edu",
-      phone: "+91-9876543212",
-      joiningDate: "2015-08-10",
-      status: "Active",
-    },
-    {
-      id: "T004",
-      name: "Mrs. Priya Singh",
-      designation: "Assistant Professor",
-      department: "Arts",
-      subject: "English Literature",
-      qualification: "M.A in English",
-      experience: "6 years",
-      email: "priya.singh@bncollege.edu",
-      phone: "+91-9876543213",
-      joiningDate: "2017-06-01",
-      status: "Active",
-    },
-    {
-      id: "T005",
-      name: "Mr. Vikash Yadav",
-      designation: "Lecturer",
-      department: "Commerce",
-      subject: "Accounting & Finance",
-      qualification: "M.Com, CA",
-      experience: "5 years",
-      email: "vikash.yadav@bncollege.edu",
-      phone: "+91-9876543214",
-      joiningDate: "2018-09-15",
-      status: "Active",
-    },
-  ];
+  useEffect(() => {
+    const fetchFacultyData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await FacultyService.getAllFaculty();
+        if (response.success && response.data) {
+          setTeachingStaffData(response.data);
+        } else {
+          toast({
+            title: 'Error fetching faculty',
+            description: response.message || 'Failed to load faculty data',
+            variant: 'destructive'
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching faculty:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load faculty data. Please try again.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFacultyData();
+  }, [toast]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="ml-2 text-lg text-slate-600">Loading faculty data...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -183,15 +164,15 @@ export default function TeachingStaff() {
               <CardContent className="space-y-3">
                 <div className="flex items-center text-sm text-slate-600">
                   <BookOpen className="h-4 w-4 mr-2 text-purple-500" />
-                  <span className="font-medium">{staff.department}</span>
+                  <span className="font-medium">{staff.department_name || 'Not specified'}</span>
                 </div>
                 
                 <div className="text-sm text-slate-600">
-                  <span className="font-medium">Subject:</span> {staff.subject}
+                  <span className="font-medium">Subjects:</span> {staff.subjects?.join(', ') || 'Not assigned'}
                 </div>
                 
                 <div className="text-sm text-slate-600">
-                  <span className="font-medium">Qualification:</span> {staff.qualification}
+                  <span className="font-medium">Experience:</span> {staff.experience || 'Not specified'}
                 </div>
                 
                 <div className="flex items-center text-sm text-slate-600">
@@ -206,19 +187,19 @@ export default function TeachingStaff() {
                   </div>
                   <div className="flex items-center text-sm text-slate-600">
                     <Phone className="h-4 w-4 mr-2 text-green-500" />
-                    <span className="text-xs">{staff.phone}</span>
+                    <span className="text-xs">{staff.phone || 'Not provided'}</span>
                   </div>
                 </div>
                 
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-xs text-slate-500">
-                    Joined: {new Date(staff.joiningDate).toLocaleDateString()}
+                    Joined: {staff.created_at ? new Date(staff.created_at).toLocaleDateString() : 'Not available'}
                   </span>
                   <Badge 
                     variant="secondary" 
                     className="bg-green-100 text-green-800 text-xs"
                   >
-                    {staff.status}
+                    Active
                   </Badge>
                 </div>
               </CardContent>

@@ -64,6 +64,7 @@ export interface TimetableData {
   department: string;
   section?: string;
   academicYear: string;
+  numberOfStudents?: number;
   entries: TimetableEntry[];
   createdBy: string;
   createdAt: string;
@@ -76,6 +77,7 @@ export interface CreateTimetableRequest {
   department: string;
   section?: string;
   academicYear: string;
+  numberOfStudents?: number;
   entries: Omit<TimetableEntry, "id">[];
 }
 
@@ -112,6 +114,7 @@ export interface BookingRequest {
   id: string;
   requesterId: string;
   requesterDepartment: string;
+  requesterDesignation?: string; // Added to identify HODs
   targetResourceId: string;
   targetDepartment: string;
   timeSlotId: string;
@@ -129,6 +132,7 @@ export interface BookingRequest {
 export interface CreateBookingRequestRequest {
   requesterId: string;
   requesterDepartment: string;
+  requesterDesignation?: string; // Added to identify HODs
   targetResourceId: string;
   targetDepartment: string;
   timeSlotId: string;

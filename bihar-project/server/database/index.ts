@@ -6,11 +6,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Database configuration
+// Database configuration - point to data directory
 const db = knex({
   client: 'better-sqlite3',
   connection: {
-    filename: path.join(__dirname, 'bihar_university.sqlite'),
+    filename: path.join(__dirname, '..', '..', 'data', 'bihar_university.sqlite'),
   },
   useNullAsDefault: true,
 });
@@ -133,8 +133,17 @@ export async function initializeDatabase() {
       table.foreign('department_id').references('departments.id');
       table.string('section');
       table.string('academic_year').notNullable();
+      table.integer('number_of_students').defaultTo(0);
       table.boolean('is_active').defaultTo(true);
       table.timestamps(true, true);
+    });
+  }
+
+  // Check if number_of_students column exists, if not add it
+  const hasNumberOfStudentsColumn = await db.schema.hasColumn('timetables', 'number_of_students');
+  if (!hasNumberOfStudentsColumn) {
+    await db.schema.table('timetables', (table) => {
+      table.integer('number_of_students').defaultTo(0);
     });
   }
 
