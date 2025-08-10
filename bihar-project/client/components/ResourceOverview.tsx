@@ -52,7 +52,7 @@ export default function ResourceOverview() {
             className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white flex items-center space-x-2"
           >
             <University className="h-4 w-4" />
-            <span>University Resources</span>
+            <span>College Resources</span>
           </TabsTrigger>
           <TabsTrigger
             value="department"
@@ -76,7 +76,7 @@ export default function ResourceOverview() {
             <div className="flex items-start space-x-3">
               <University className="h-5 w-5 text-indigo-600 mt-1" />
               <div>
-                <h3 className="font-semibold text-slate-900">University Resources - Shared Access View</h3>
+                <h3 className="font-semibold text-slate-900">College Resources - Shared Access View</h3>
                 <p className="text-sm text-slate-600 mt-1">
                   View all college-wide shared resources (seminar halls, conference rooms, auditoriums), 
                   see real-time availability, request bookings for resources owned by other departments, 

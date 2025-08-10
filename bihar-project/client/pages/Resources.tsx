@@ -818,7 +818,7 @@ export default function Resources() {
       <Tabs defaultValue="department" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="department">Department Resources</TabsTrigger>
-          <TabsTrigger value="university">University Resources</TabsTrigger>
+          <TabsTrigger value="university">College Resources</TabsTrigger>
         </TabsList>
         
         <TabsContent value="department">
@@ -831,7 +831,7 @@ export default function Resources() {
         <TabsContent value="university">
           <ResourceCategory 
             resources={universityResources} 
-            title="Other University Resources"
+            title="Other College Resources"
             isShared={true}
           />
         </TabsContent>

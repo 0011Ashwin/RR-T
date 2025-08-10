@@ -196,7 +196,7 @@ export default function UniversityResources() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">University Resources</h1>
+          <h1 className="text-3xl font-bold text-slate-900">College Resources</h1>
           <p className="text-slate-600 mt-1">Shared facilities available for booking</p>
         </div>
         <div className="flex items-center space-x-3">
