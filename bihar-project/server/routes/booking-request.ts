@@ -177,6 +177,7 @@ router.post('/', async (req, res) => {
       expectedAttendance: bookingRequest.expectedAttendance,
       requestDate: new Date().toISOString(),
       status: shouldAutoApprove ? 'approved' as const : 'pending' as const,
+      notes: '', // Initialize notes field
       ...(shouldAutoApprove && {
         approvedBy: `Auto-approved (${bookingRequest.requesterId} - Same Department HOD)`,
         responseDate: new Date().toISOString(),
@@ -209,7 +210,7 @@ router.post('/', async (req, res) => {
     // Store extra data in notes field but mark it as internal
     const internalNotes = `[INTERNAL_DATA]${JSON.stringify(extraData)}[/INTERNAL_DATA]`;
     
-    // Add to existing notes or create new notes
+    // Always add the internal notes to store the extra data needed for timetable creation
     if (validBookingRequestFields.notes) {
       validBookingRequestFields.notes += ` ${internalNotes}`;
     } else {
@@ -300,6 +301,20 @@ router.put('/:id/status', async (req, res) => {
           }
         }
         
+        // If no extra data found, create fallback data based on the booking request
+        if (!extraData.timetableId) {
+          console.warn('No extra data found in notes, using fallback values');
+          extraData = {
+            timetableId: '1', // Default to the first timetable for now
+            subjectName: currentRequest.courseName,
+            subjectCode: currentRequest.courseName.toLowerCase().replace(/\s+/g, ''),
+            facultyId: '1', // Default faculty
+            sessionType: 'theory',
+            startTime: null, // Will be calculated from timeSlotId
+            endTime: null    // Will be calculated from timeSlotId
+          };
+        }
+        
         // First, create the subject if it doesn't exist
         let subjectId;
         const subjectName = extraData.subjectName || currentRequest.courseName;
@@ -316,12 +331,20 @@ router.put('/:id/status', async (req, res) => {
               subjectId = existingSubject.id;
               console.log('Using existing subject:', existingSubject);
             } else {
+              // Get department ID from department name
+              const department = await dbConnection('departments')
+                .where('name', currentRequest.requesterDepartment)
+                .first();
+              
+              const departmentId = department ? department.id : 1; // Fallback to first department
+              
               // Create new subject
               const [newSubjectId] = await dbConnection('subjects').insert({
                 name: subjectName,
                 code: subjectCode,
                 type: extraData.sessionType || 'theory',
-                department: currentRequest.requesterDepartment,
+                department_id: departmentId,
+                credits: 3, // Default credits
               }).returning('id');
               subjectId = newSubjectId.id || newSubjectId;
               console.log('Created new subject with ID:', subjectId);
@@ -349,9 +372,20 @@ router.put('/:id/status', async (req, res) => {
           end_time: extraData.endTime || endTime,
         };
 
-        console.log('Creating timetable entry for approved booking request:', entryData);
+        console.log('Creating timetable entry for approved booking request');
+        console.log('Extra data used:', extraData);
+        console.log('Current request data:', currentRequest);
+        
         const newEntry = await TimetableModel.addEntry(entryData);
         console.log('Timetable entry created successfully:', newEntry);
+        
+        // Verify the entry was created with the correct timetable_id
+        if (newEntry && newEntry.timetable_id !== entryData.timetable_id) {
+          console.warn('⚠️ Warning: Timetable entry created with different ID than expected!', {
+            expected: entryData.timetable_id,
+            actual: newEntry.timetable_id
+          });
+        }
       } catch (entryError) {
         console.error('Error creating timetable entry for approved booking request:', entryError);
         console.error('Error details:', entryError.message);
@@ -470,7 +504,126 @@ router.patch('/shared-resources/:id/approve', async (req, res) => {
       responseDate: new Date().toISOString(),
       notes: notes || ''
     });
-    
+
+    // If approved, create the actual timetable entry (same logic as main approval endpoint)
+    if (status === 'approved') {
+      console.log('Shared resource request approved - creating timetable entry');
+      try {
+        // Import required models
+        const { TimetableModel } = await import('../models/Timetable.js');
+        const db = await import('../database/index.js');
+        const dbConnection = db.default;
+        
+        console.log('Current request data for timetable creation:', bookingRequest);
+        
+        // Extract extra data from notes field
+        let extraData: any = {};
+        if (bookingRequest.notes && bookingRequest.notes.includes('[INTERNAL_DATA]')) {
+          try {
+            const matches = bookingRequest.notes.match(/\[INTERNAL_DATA\](.*?)\[\/INTERNAL_DATA\]/);
+            if (matches && matches[1]) {
+              extraData = JSON.parse(matches[1]);
+              console.log('Extracted extra data:', extraData);
+            }
+          } catch (e) {
+            console.warn('Could not parse extra data from notes:', e);
+          }
+        }
+        
+        // If no extra data found, create fallback data based on the booking request
+        if (!extraData.timetableId) {
+          console.warn('No extra data found in notes, using fallback values');
+          extraData = {
+            timetableId: '1', // Default to the first timetable for now
+            subjectName: bookingRequest.courseName,
+            subjectCode: bookingRequest.courseName.toLowerCase().replace(/\s+/g, ''),
+            facultyId: '1', // Default faculty
+            sessionType: 'theory',
+            startTime: null, // Will be calculated from timeSlotId
+            endTime: null    // Will be calculated from timeSlotId
+          };
+        }
+        
+        // First, create the subject if it doesn't exist
+        let subjectId;
+        const subjectName = extraData.subjectName || bookingRequest.courseName;
+        const subjectCode = extraData.subjectCode || bookingRequest.courseName.toLowerCase().replace(/\s+/g, '');
+        
+        if (subjectName) {
+          try {
+            // Check if subject already exists
+            const existingSubject = await dbConnection('subjects')
+              .where('code', subjectCode)
+              .first();
+            
+            if (existingSubject) {
+              subjectId = existingSubject.id;
+              console.log('Using existing subject:', existingSubject);
+            } else {
+              // Get department ID from department name
+              const department = await dbConnection('departments')
+                .where('name', bookingRequest.requesterDepartment)
+                .first();
+              
+              const departmentId = department ? department.id : 1; // Fallback to first department
+              
+              // Create new subject
+              const [newSubjectId] = await dbConnection('subjects').insert({
+                name: subjectName,
+                code: subjectCode,
+                type: extraData.sessionType || 'theory',
+                department_id: departmentId,
+                credits: 3, // Default credits
+              }).returning('id');
+              subjectId = newSubjectId.id || newSubjectId;
+              console.log('Created new subject with ID:', subjectId);
+            }
+          } catch (subjectError) {
+            console.error('Error creating subject:', subjectError);
+            subjectId = 1; // Fallback to default subject
+          }
+        } else {
+          subjectId = 1; // Fallback to default subject
+        }
+        
+        // Convert timeSlotId to start/end times
+        const timeSlot = ['08:00-09:00', '09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00'][parseInt(bookingRequest.timeSlotId) - 1];
+        const [startTime, endTime] = timeSlot ? timeSlot.split('-') : ['09:00', '10:00'];
+        
+        // Create timetable entry data
+        const entryData = {
+          timetable_id: parseInt(extraData.timetableId || '1'),
+          subject_id: subjectId,
+          faculty_id: parseInt(extraData.facultyId || '1'),
+          classroom_id: parseInt(bookingRequest.targetResourceId),
+          day_of_week: bookingRequest.dayOfWeek,
+          start_time: extraData.startTime || startTime,
+          end_time: extraData.endTime || endTime,
+        };
+
+        console.log('Creating timetable entry for approved shared resource request');
+        console.log('Extra data used:', extraData);
+        console.log('Current request data:', bookingRequest);
+        
+        const newEntry = await TimetableModel.addEntry(entryData);
+        console.log('Timetable entry created successfully:', newEntry);
+        
+        // Verify the entry was created with the correct timetable_id
+        if (newEntry && newEntry.timetable_id !== entryData.timetable_id) {
+          console.warn('⚠️ Warning: Timetable entry created with different ID than expected!', {
+            expected: entryData.timetable_id,
+            actual: newEntry.timetable_id
+          });
+        }
+      } catch (entryError) {
+        console.error('Error creating timetable entry for approved shared resource request:', entryError);
+        console.error('Error details:', entryError.message);
+        console.error('Stack trace:', entryError.stack);
+        // Don't fail the approval if timetable entry creation fails
+        // The request is still approved, but manual intervention may be needed
+      }
+    }
+
     res.json({
       success: true,
       data: updatedRequest,

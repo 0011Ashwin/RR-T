@@ -203,7 +203,12 @@ export default function PrincipalBookingRequests() {
   // Filter out any internal booking system metadata from notes
   const filterInternalData = (notes: string | null | undefined): string => {
     if (!notes) return '';
-    return notes.replace(/\[INTERNAL:.*?\]/g, '').trim();
+    // Remove internal data that starts with [INTERNAL_DATA] and ends with [/INTERNAL_DATA]
+    let filtered = notes.replace(/\[INTERNAL_DATA\].*?\[\/INTERNAL_DATA\]/g, '').trim();
+    // Also remove any leftover internal markers that might not be properly closed
+    filtered = filtered.replace(/\[INTERNAL_DATA\].*$/g, '').trim();
+    filtered = filtered.replace(/.*\[\/INTERNAL_DATA\]/g, '').trim();
+    return filtered;
   };
 
   return (
@@ -307,7 +312,7 @@ export default function PrincipalBookingRequests() {
                           Requested: {new Date(request.requestDate).toLocaleString()}
                         </div>
 
-                        {request.notes && filterInternalData(request.notes) && (
+                        {request.notes && filterInternalData(request.notes).length > 0 && (
                           <div className="mt-3 p-3 bg-slate-50 rounded-lg">
                             <div className="text-sm font-medium text-slate-700 mb-1">Additional Notes:</div>
                             <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
@@ -419,7 +424,7 @@ export default function PrincipalBookingRequests() {
                           )}
                         </div>
 
-                        {request.notes && filterInternalData(request.notes) && (
+                        {request.notes && filterInternalData(request.notes).length > 0 && (
                           <div className="mt-3 p-3 bg-slate-50 rounded-lg">
                             <div className="text-sm font-medium text-slate-700 mb-1">Response Notes:</div>
                             <div className="text-sm text-slate-600">{filterInternalData(request.notes)}</div>
