@@ -147,6 +147,21 @@ export default function RoutineBuilder() {
         }));
         
         console.log('Fetched routines with sessions:', fetchedRoutines);
+        
+        // Check if there are any new sessions compared to current state
+        const currentSessionCount = routines.reduce((total, routine) => total + routine.sessions.length, 0);
+        const newSessionCount = fetchedRoutines.reduce((total, routine) => total + routine.sessions.length, 0);
+        
+        if (newSessionCount > currentSessionCount) {
+          const addedSessions = newSessionCount - currentSessionCount;
+          console.log(`🎉 Detected ${addedSessions} new sessions after refresh!`);
+          toast({
+            title: "New Sessions Added!",
+            description: `${addedSessions} new session(s) have been added to your timetables.`,
+            variant: "default",
+          });
+        }
+        
         setRoutines(fetchedRoutines);
         
         // Update selectedRoutine to reflect the new data if one is currently selected
@@ -163,10 +178,12 @@ export default function RoutineBuilder() {
         // Force re-render
         setRefreshKey(prev => prev + 1);
         
-        toast({
-          title: "Success",
-          description: "Routine data refreshed successfully!",
-        });
+        if (currentSessionCount === 0 || newSessionCount === currentSessionCount) {
+          toast({
+            title: "Success",
+            description: "Routine data refreshed successfully!",
+          });
+        }
       }
     } catch (error) {
       console.error('Error refreshing routine data:', error);
@@ -370,6 +387,54 @@ export default function RoutineBuilder() {
     };
   }, [routines.length, currentHOD]);
 
+  // Poll for booking request status changes every 30 seconds
+  useEffect(() => {
+    if (!currentHOD) return;
+
+    const pollForUpdates = async () => {
+      try {
+        // Check for newly approved booking requests
+        const response = await axios.get(`/api/booking-requests/requester/${currentHOD.department}`);
+        if (response.data.success && response.data.data) {
+          const allRequests = response.data.data;
+          const approvedRequests = allRequests.filter((req: any) => req.status === 'approved');
+          
+          // Compare with previous approved count
+          const currentApprovedCount = approvedRequests.length;
+          const storedApprovedCount = parseInt(localStorage.getItem(`approvedRequests_${currentHOD.department}`) || '0');
+          
+          // If there are new approved requests, refresh the timetable
+          if (currentApprovedCount > storedApprovedCount) {
+            console.log('🎉 New booking requests approved! Refreshing timetable...');
+            localStorage.setItem(`approvedRequests_${currentHOD.department}`, currentApprovedCount.toString());
+            await refreshRoutineData();
+            
+            toast({
+              title: "Booking Request Approved!",
+              description: "Your shared resource request has been approved. The timetable has been updated.",
+              variant: "default",
+            });
+          }
+          
+          // Update pending requests
+          setBookingRequests(allRequests.filter((req: any) => req.status === 'pending'));
+        }
+      } catch (error) {
+        console.error('Error polling for booking request updates:', error);
+      }
+    };
+
+    // Initial poll
+    pollForUpdates();
+    
+    // Set up interval polling every 30 seconds
+    const pollInterval = setInterval(pollForUpdates, 30000);
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [currentHOD, toast]);
+
   const autoGenerateSessions = (coursesToSchedule: Course[], availableResources: Resource[]): ClassSession[] => {
     const sessions: ClassSession[] = [];
     let sessionId = 1;
@@ -544,7 +609,6 @@ export default function RoutineBuilder() {
       console.log('Sending timetable data to API:', timetableData);
       const response = await TimetableService.createTimetable(timetableData);
       console.log('API Response:', response);
-      console.log('API Response Data:', JSON.stringify(response.data, null, 2)); // Debug: Check exact structure
       
       if (response.success && response.data) {
         // Convert the created timetable to routine format
@@ -1281,6 +1345,11 @@ export default function RoutineBuilder() {
             <Wand2 className="h-4 w-4 mr-2" />
             Refresh Data
           </Button>
+          {bookingRequests.length > 0 && (
+            <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 border-yellow-300">
+              {bookingRequests.length} Pending Requests
+            </Badge>
+          )}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-indigo-600 hover:bg-indigo-700">
